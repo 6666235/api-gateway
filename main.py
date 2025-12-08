@@ -133,19 +133,27 @@ async def stream_claude(client: httpx.AsyncClient, url: str, headers: dict, payl
 async def chat_completions(request: ChatRequest, authorization: Optional[str] = Header(None)):
     provider = request.provider.lower()
     
-    if provider not in PROVIDERS:
+    # 自定义平台
+    if provider == "custom":
+        if not request.custom_url:
+            raise HTTPException(status_code=400, detail="自定义平台需要填写 API 地址")
+        if not request.api_key:
+            raise HTTPException(status_code=400, detail="自定义平台需要填写 API Key")
+        api_key = request.api_key
+        base_url = request.custom_url.rstrip('/')
+        provider_type = "openai"
+    elif provider not in PROVIDERS:
         raise HTTPException(status_code=400, detail=f"不支持的平台: {provider}")
-    
-    config = PROVIDERS[provider]
-    api_key = request.api_key or os.getenv(config["env_key"])
-    base_url = request.custom_url or config["base_url"]
-    
-    if not api_key:
-        raise HTTPException(status_code=500, detail=f"未配置 {provider} 的 API Key，请在网页上输入或在 .env 文件中设置")
+    else:
+        config = PROVIDERS[provider]
+        api_key = request.api_key or os.getenv(config["env_key"])
+        base_url = request.custom_url or config["base_url"]
+        provider_type = config.get("type", "openai")
+        
+        if not api_key:
+            raise HTTPException(status_code=500, detail=f"未配置 {provider} 的 API Key，请在网页上输入或在 .env 文件中设置")
     
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
-    
-    provider_type = config.get("type", "openai")
     
     async with httpx.AsyncClient(timeout=120) as client:
         try:
