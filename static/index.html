@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Gateway Chat</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-chat: #0f0f23;
+            --text-primary: #eee;
+            --text-secondary: #aaa;
+            --accent: #667eea;
+            --user-msg: #4a5568;
+            --assistant-msg: #2d3748;
+            --error: #e53e3e;
+        }
+        .light-theme {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: #e0e0e0;
+            --bg-chat: #fff;
+            --text-primary: #333;
+            --text-secondary: #666;
+            --user-msg: #e3f2fd;
+            --assistant-msg: #f5f5f5;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+        }
+        .sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .sidebar h2 { margin-bottom: 15px; font-size: 18px; }
+        .sidebar label { margin-top: 12px; font-size: 13px; color: var(--text-secondary); }
+        .sidebar select, .sidebar input[type="text"], .sidebar input[type="number"] {
+            margin-top: 5px;
+            padding: 8px;
+            border: none;
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 13px;
+            width: 100%;
+        }
+        .sessions { margin-top: 15px; flex: 1; overflow-y: auto; }
+        .session-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: var(--bg-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+        }
+        .session-item:hover { opacity: 0.8; }
+        .session-item.active { border-left: 3px solid var(--accent); }
+        .session-item .delete { color: var(--error); cursor: pointer; padding: 2px 6px; }
+        .btn-group { display: flex; gap: 8px; margin-top: 15px; flex-wrap: wrap; }
+        .btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            flex: 1;
+            min-width: 70px;
+        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-danger { background: var(--error); color: #fff; }
+        .btn-secondary { background: var(--bg-primary); color: var(--text-primary); }
+        .main { flex: 1; display: flex; flex-direction: column; padding: 15px; }
+        .stats {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: var(--bg-chat);
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+            border-radius: 12px;
+            line-height: 1.6;
+        }
+        .message.user { background: var(--user-msg); margin-left: auto; }
+        .message.assistant { background: var(--assistant-msg); }
+        .message.error { background: var(--error); color: #fff; }
+        .message pre { margin: 10px 0; border-radius: 6px; overflow-x: auto; }
+        .message code { font-family: 'Consolas', monospace; font-size: 14px; }
+        .message p { margin: 8px 0; }
+        .message table { border-collapse: collapse; margin: 10px 0; }
+        .message th, .message td { border: 1px solid var(--text-secondary); padding: 8px; }
+        .input-area { display: flex; gap: 10px; }
+        .input-area textarea {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            background: var(--bg-chat);
+            color: var(--text-primary);
+            font-size: 14px;
+            resize: none;
+            height: 60px;
+        }
+        .input-area button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 12px;
+            background: var(--accent);
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .input-area button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .toggle-theme {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: var(--bg-secondary);
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <button class="toggle-theme" onclick="toggleTheme()">🌙</button>
+    <div class="sidebar">
+        <h2>⚡ API Gateway</h2>
+        <label>平台</label>
+        <select id="provider">
+            <optgroup label="国际主流">
+                <option value="openai">OpenAI</option>
+                <option value="azure_openai">Azure OpenAI</option>
+                <option value="claude">Anthropic Claude</option>
+                <option value="gemini">Google Gemini</option>
+                <option value="vertex_ai">Vertex AI</option>
+                <option value="mistral">Mistral</option>
+                <option value="groq">Groq</option>
+                <option value="together">Together</option>
+                <option value="fireworks">Fireworks</option>
+                <option value="perplexity">Perplexity</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="grok">Grok (xAI)</option>
+                <option value="hyperbolic">Hyperbolic</option>
+                <option value="nvidia">英伟达 NVIDIA</option>
+                <option value="github_models">GitHub Models</option>
+                <option value="github_copilot">GitHub Copilot</option>
+                <option value="aws_bedrock">AWS Bedrock</option>
+                <option value="jina">Jina</option>
+                <option value="voyage">Voyage AI</option>
+                <option value="poe">Poe</option>
+            </optgroup>
+            <optgroup label="国内平台">
+                <option value="deepseek">深度求索 DeepSeek</option>
+                <option value="zhipu">智谱 GLM</option>
+                <option value="moonshot">月之暗面 Kimi</option>
+                <option value="baichuan">百川</option>
+                <option value="yi">零一万物</option>
+                <option value="qwen">阿里云百炼 Qwen</option>
+                <option value="stepfun">阶跃星辰</option>
+                <option value="minimax">MiniMax</option>
+                <option value="doubao">豆包</option>
+                <option value="hunyuan">腾讯混元</option>
+                <option value="tencent_ti">腾讯云 TI</option>
+                <option value="baidu_qianfan">百度云千帆</option>
+                <option value="tianyi">天翼云息壤</option>
+                <option value="wuxinqiong">无问芯穹</option>
+            </optgroup>
+            <optgroup label="API 聚合平台">
+                <option value="siliconflow">硅基流动</option>
+                <option value="aihubmix">AiHubMix</option>
+                <option value="ocoolai">ocoolAI</option>
+                <option value="alaya">Alaya NeW</option>
+                <option value="dmxapi">DMXAPI</option>
+                <option value="aionly">唯一AI (AiOnly)</option>
+                <option value="burncloud">BurnCloud</option>
+                <option value="tokenflux">TokenFlux</option>
+                <option value="ai302">302.AI</option>
+                <option value="cephalon">Cephalon</option>
+                <option value="lanfun">蓝耘科技</option>
+                <option value="ph8">PH8 大模型开放平台</option>
+                <option value="ppio">PPIO 派欧云</option>
+                <option value="qiniu">七牛云 AI 推理</option>
+                <option value="longcat">longcat</option>
+            </optgroup>
+            <optgroup label="本地/自托管">
+                <option value="ollama">Ollama</option>
+                <option value="lmstudio">LM Studio</option>
+                <option value="gpustack">GPUStack</option>
+                <option value="intel_ovms">Intel OVMS</option>
+            </optgroup>
+        </select>
+        <label>模型</label>
+        <input type="text" id="model" value="gpt-4o">
+        <label>自定义 API 地址 (可选)</label>
+        <input type="text" id="customUrl" placeholder="留空使用默认地址">
+        <label>Temperature</label>
+        <input type="number" id="temperature" value="0.7" min="0" max="2" step="0.1">
+        <label>Max Tokens</label>
+        <input type="number" id="max_tokens" value="2048">
+        <label style="display:flex;align-items:center;gap:8px;margin-top:12px;">
+            <input type="checkbox" id="stream" checked> 流式输出
+        </label>
+        <div class="sessions">
+            <label>对话列表</label>
+            <div id="sessionList"></div>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-primary" onclick="newSession()">新对话</button>
+            <button class="btn btn-danger" onclick="clearSession()">清空</button>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-secondary" onclick="exportJSON()">导出JSON</button>
+            <button class="btn btn-secondary" onclick="exportMD()">导出MD</button>
+        </div>
+    </div>
+    <div class="main">
+        <div class="stats">
+            <span>Token: <strong id="tokenCount">0</strong></span>
+            <span>消息: <strong id="msgCount">0</strong></span>
+        </div>
+        <div class="chat-container" id="chat"></div>
+        <div class="input-area">
+            <textarea id="input" placeholder="输入消息... (Enter发送, Shift+Enter换行)" onkeydown="handleKey(event)"></textarea>
+            <button id="sendBtn" onclick="send()">发送</button>
+        </div>
+    </div>
+<script>
+const modelMap = {
+    // 国际主流
+    openai: 'gpt-4o',
+    azure_openai: 'gpt-4o',
+    claude: 'claude-sonnet-4-20250514',
+    gemini: 'gemini-pro',
+    vertex_ai: 'gemini-pro',
+    mistral: 'mistral-large-latest',
+    groq: 'llama-3.3-70b-versatile',
+    together: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+    fireworks: 'accounts/fireworks/models/llama-v3p3-70b-instruct',
+    perplexity: 'llama-3.1-sonar-large-128k-online',
+    openrouter: 'openai/gpt-4o',
+    grok: 'grok-2-latest',
+    hyperbolic: 'meta-llama/Llama-3.3-70B-Instruct',
+    nvidia: 'meta/llama-3.1-405b-instruct',
+    github_models: 'gpt-4o',
+    github_copilot: 'gpt-4o',
+    aws_bedrock: 'anthropic.claude-3-sonnet',
+    jina: 'jina-embeddings-v2-base-en',
+    voyage: 'voyage-large-2',
+    poe: 'GPT-4o',
+    // 国内平台
+    deepseek: 'deepseek-chat',
+    zhipu: 'glm-4-plus',
+    moonshot: 'moonshot-v1-128k',
+    baichuan: 'Baichuan4',
+    yi: 'yi-large',
+    qwen: 'qwen-plus',
+    stepfun: 'step-2-16k',
+    minimax: 'abab6.5s-chat',
+    doubao: 'doubao-pro-32k',
+    hunyuan: 'hunyuan-pro',
+    tencent_ti: 'hunyuan-pro',
+    baidu_qianfan: 'ernie-4.0-8k',
+    tianyi: 'hunyuan-pro',
+    wuxinqiong: 'wuxinqiong-chat',
+    // API 聚合平台
+    siliconflow: 'deepseek-ai/DeepSeek-V3',
+    aihubmix: 'gpt-4o',
+    ocoolai: 'gpt-4o',
+    alaya: 'gpt-4o',
+    dmxapi: 'gpt-4o',
+    aionly: 'gpt-4o',
+    burncloud: 'gpt-4o',
+    tokenflux: 'gpt-4o',
+    ai302: 'gpt-4o',
+    cephalon: 'gpt-4o',
+    lanfun: 'gpt-4o',
+    ph8: 'gpt-4o',
+    ppio: 'gpt-4o',
+    qiniu: 'gpt-4o',
+    longcat: 'gpt-4o',
+    // 本地
+    ollama: 'llama3.2',
+    lmstudio: 'local-model',
+    gpustack: 'local-model',
+    intel_ovms: 'local-model'
+};
+
+let sessions = JSON.parse(localStorage.getItem('sessions') || '[]');
+let currentSessionId = localStorage.getItem('currentSessionId');
+let totalTokens = 0;
+
+marked.setOptions({
+    highlight: (code, lang) => {
+        if (lang && hljs.getLanguage(lang)) {
+            return hljs.highlight(code, { language: lang }).value;
+        }
+        return hljs.highlightAuto(code).value;
+    },
+    breaks: true
+});
+
+function init() {
+    if (sessions.length === 0) newSession();
+    else {
+        if (!currentSessionId || !sessions.find(s => s.id === currentSessionId)) {
+            currentSessionId = sessions[0].id;
+        }
+        renderSessions();
+        loadSession(currentSessionId);
+    }
+    const theme = localStorage.getItem('theme') || 'dark';
+    if (theme === 'light') document.body.classList.add('light-theme');
+    document.querySelector('.toggle-theme').textContent = theme === 'light' ? '🌙' : '☀️';
+}
+
+function toggleTheme() {
+    document.body.classList.toggle('light-theme');
+    const isLight = document.body.classList.contains('light-theme');
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+    document.querySelector('.toggle-theme').textContent = isLight ? '🌙' : '☀️';
+}
+
+function newSession() {
+    const session = {
+        id: Date.now().toString(),
+        name: '新对话 ' + (sessions.length + 1),
+        messages: [],
+        tokens: 0,
+        provider: document.getElementById('provider').value,
+        model: document.getElementById('model').value
+    };
+    sessions.unshift(session);
+    currentSessionId = session.id;
+    saveSessions();
+    renderSessions();
+    renderChat();
+}
+
+function saveSessions() {
+    localStorage.setItem('sessions', JSON.stringify(sessions));
+    localStorage.setItem('currentSessionId', currentSessionId);
+}
+
+function getCurrentSession() {
+    return sessions.find(s => s.id === currentSessionId);
+}
+
+function renderSessions() {
+    const list = document.getElementById('sessionList');
+    list.innerHTML = sessions.map(s => `
+        <div class="session-item ${s.id === currentSessionId ? 'active' : ''}" onclick="loadSession('${s.id}')">
+            <span>${s.name}</span>
+            <span class="delete" onclick="event.stopPropagation();deleteSession('${s.id}')">×</span>
+        </div>
+    `).join('');
+}
+
+function loadSession(id) {
+    currentSessionId = id;
+    const session = getCurrentSession();
+    if (session) {
+        document.getElementById('provider').value = session.provider || 'openai';
+        document.getElementById('model').value = session.model || modelMap[session.provider];
+        totalTokens = session.tokens || 0;
+    }
+    saveSessions();
+    renderSessions();
+    renderChat();
+}
+
+function deleteSession(id) {
+    sessions = sessions.filter(s => s.id !== id);
+    if (sessions.length === 0) newSession();
+    else if (currentSessionId === id) currentSessionId = sessions[0].id;
+    saveSessions();
+    renderSessions();
+    renderChat();
+}
+
+function clearSession() {
+    const session = getCurrentSession();
+    if (session) {
+        session.messages = [];
+        session.tokens = 0;
+        totalTokens = 0;
+        saveSessions();
+        renderChat();
+    }
+}
+
+function renderChat() {
+    const session = getCurrentSession();
+    const chat = document.getElementById('chat');
+    if (!session) { chat.innerHTML = ''; return; }
+    
+    chat.innerHTML = session.messages.map(m => {
+        const content = m.role === 'assistant' ? marked.parse(m.content) : escapeHtml(m.content);
+        return `<div class="message ${m.role} ${m.error ? 'error' : ''}">${content}</div>`;
+    }).join('');
+    
+    document.getElementById('tokenCount').textContent = session.tokens || 0;
+    document.getElementById('msgCount').textContent = session.messages.length;
+    chat.scrollTop = chat.scrollHeight;
+    document.querySelectorAll('.message pre code').forEach(el => hljs.highlightElement(el));
+}
+
+function escapeHtml(text) {
+    return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function addMessage(role, content, error = false) {
+    const session = getCurrentSession();
+    if (!session) return;
+    session.messages.push({ role, content, error });
+    if (session.messages.length === 1) {
+        session.name = content.slice(0, 20) + (content.length > 20 ? '...' : '');
+    }
+    saveSessions();
+    renderChat();
+    renderSessions();
+}
+
+function updateLastMessage(content) {
+    const session = getCurrentSession();
+    if (session && session.messages.length > 0) {
+        session.messages[session.messages.length - 1].content = content;
+        saveSessions();
+        renderChat();
+    }
+}
+
+document.getElementById('provider').onchange = function() {
+    document.getElementById('model').value = modelMap[this.value] || '';
+    const session = getCurrentSession();
+    if (session) {
+        session.provider = this.value;
+        session.model = modelMap[this.value];
+        saveSessions();
+    }
+};
+
+function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        send();
+    }
+}
+
+async function send() {
+    const input = document.getElementById('input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    input.value = '';
+    addMessage('user', text);
+
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = true;
+
+    const session = getCurrentSession();
+    session.provider = document.getElementById('provider').value;
+    session.model = document.getElementById('model').value;
+
+    const payload = {
+        provider: session.provider,
+        model: session.model,
+        messages: session.messages.filter(m => !m.error).map(m => ({ role: m.role, content: m.content })),
+        temperature: parseFloat(document.getElementById('temperature').value),
+        max_tokens: parseInt(document.getElementById('max_tokens').value),
+        stream: document.getElementById('stream').checked,
+        custom_url: document.getElementById('customUrl').value || null
+    };
+
+    try {
+        if (payload.stream) {
+            const response = await fetch('/v1/chat/completions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || `HTTP ${response.status}`);
+            }
+            
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            addMessage('assistant', '');
+            let fullText = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value);
+                for (const line of chunk.split('\n')) {
+                    if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            const content = data.choices?.[0]?.delta?.content || '';
+                            fullText += content;
+                            updateLastMessage(fullText);
+                            if (data.usage) {
+                                session.tokens = (session.tokens || 0) + (data.usage.total_tokens || 0);
+                                document.getElementById('tokenCount').textContent = session.tokens;
+                            }
+                        } catch {}
+                    }
+                }
+            }
+        } else {
+            const response = await fetch('/v1/chat/completions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || `HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            let content = '';
+            if (payload.provider === 'claude') {
+                content = data.content?.[0]?.text || JSON.stringify(data);
+                session.tokens = (session.tokens || 0) + (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0);
+            } else if (payload.provider === 'gemini') {
+                content = data.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(data);
+            } else {
+                content = data.choices?.[0]?.message?.content || JSON.stringify(data);
+                session.tokens = (session.tokens || 0) + (data.usage?.total_tokens || 0);
+            }
+            addMessage('assistant', content);
+            document.getElementById('tokenCount').textContent = session.tokens;
+        }
+        saveSessions();
+    } catch (e) {
+        addMessage('assistant', '❌ 错误: ' + e.message, true);
+    }
+    btn.disabled = false;
+}
+
+function exportJSON() {
+    const session = getCurrentSession();
+    if (!session) return;
+    const blob = new Blob([JSON.stringify(session, null, 2)], { type: 'application/json' });
+    downloadBlob(blob, `chat-${session.id}.json`);
+}
+
+function exportMD() {
+    const session = getCurrentSession();
+    if (!session) return;
+    let md = `# ${session.name}\n\n`;
+    session.messages.forEach(m => {
+        md += `## ${m.role === 'user' ? '👤 用户' : '🤖 助手'}\n\n${m.content}\n\n`;
+    });
+    const blob = new Blob([md], { type: 'text/markdown' });
+    downloadBlob(blob, `chat-${session.id}.md`);
+}
+
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+init();
+</script>
+</body>
+</html>
