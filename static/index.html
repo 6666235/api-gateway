@@ -220,6 +220,8 @@
         </select>
         <label>模型</label>
         <input type="text" id="model" value="gpt-4o">
+        <label>API Key</label>
+        <input type="password" id="apiKey" placeholder="输入 API Key">
         <label>自定义 API 地址 (可选)</label>
         <input type="text" id="customUrl" placeholder="留空使用默认地址">
         <label>Temperature</label>
@@ -497,7 +499,8 @@ async function send() {
         temperature: parseFloat(document.getElementById('temperature').value),
         max_tokens: parseInt(document.getElementById('max_tokens').value),
         stream: document.getElementById('stream').checked,
-        custom_url: document.getElementById('customUrl').value || null
+        custom_url: document.getElementById('customUrl').value || null,
+        api_key: document.getElementById('apiKey').value || null
     };
 
     try {
