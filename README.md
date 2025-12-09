@@ -1,42 +1,58 @@
-# API Gateway
+# AI Hub - 统一 AI 对话平台
 
-统一 API 网关，支持 55+ AI 平台。
+一站式 AI 对话平台，支持多种模型服务，包含完整的用户系统和付费功能。
 
-## 支持平台
+## 功能特性
 
-- **国际主流**: OpenAI, Claude, Gemini, Mistral, Groq, Together, Fireworks, Perplexity, OpenRouter, Grok 等
-- **国内平台**: DeepSeek, 智谱GLM, 月之暗面, 百川, 零一万物, 阿里云百炼, 阶跃星辰, MiniMax, 豆包, 腾讯混元 等
-- **API聚合**: 硅基流动, AiHubMix, 302.AI, TokenFlux 等
-- **本地部署**: Ollama, LM Studio, GPUStack
+- 💬 **多模型对话** - 支持 OpenAI、Claude、DeepSeek、通义千问等多种模型
+- 🔌 **模型服务管理** - 自定义添加和管理 API 服务
+- 📝 **笔记功能** - 记录和管理你的笔记
+- 🧠 **全局记忆** - AI 会记住你的偏好和信息
+- ⚡ **快捷短语** - 创建常用提示词模板
+- 📄 **文档处理** - 上传文档让 AI 分析
+- 💳 **付费系统** - 完整的套餐和支付功能
+- 🔐 **用户系统** - 注册登录，数据云端同步
 
-## 功能
+## 快速开始
 
-- 多平台统一接口
-- 流式输出
-- 多会话管理
-- Markdown 渲染 + 代码高亮
-- Token 统计
-- 自定义 API 地址
-- 导出对话 (JSON/Markdown)
-- 暗色/亮色主题
-
-## 部署
-
-### Docker 部署
-
+### 方式一：直接运行
 ```bash
-cp .env.example .env
-# 编辑 .env 填入 API Key
-docker-compose up -d
-```
-
-### 直接运行
-
-```bash
+# 安装依赖
 pip install -r requirements.txt
-cp .env.example .env
-# 编辑 .env 填入 API Key
+
+# 启动服务
 python main.py
 ```
 
-访问 http://localhost:8000
+### 方式二：使用启动脚本 (Windows)
+双击 `start.bat`
+
+### 访问
+打开浏览器访问 http://localhost:8000
+
+## 配置 API Key
+
+编辑 `.env` 文件，填入你的 API Key：
+
+```env
+OPENAI_API_KEY=sk-xxx
+ANTHROPIC_API_KEY=sk-ant-xxx
+DEEPSEEK_API_KEY=sk-xxx
+```
+
+或者在网页界面的「模型服务」中直接配置。
+
+## 套餐说明
+
+| 套餐 | 价格 | 额度 | 功能 |
+|------|------|------|------|
+| 免费版 | ¥0 | 10,000 tokens | 基础对话 |
+| 基础版 | ¥19.9/月 | 100,000 tokens | 笔记、快捷短语 |
+| 专业版 | ¥49.9/月 | 500,000 tokens | 网络搜索、文档处理、全局记忆 |
+| 无限版 | ¥99.9/月 | 无限 | 所有功能 + 优先支持 |
+
+## 技术栈
+
+- 后端：FastAPI + SQLite
+- 前端：原生 HTML/CSS/JS
+- 支持流式输出 (SSE)

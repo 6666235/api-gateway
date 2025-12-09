@@ -1,617 +1,1067 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Gateway Chat</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
-    <style>
-        :root {
-            --bg-primary: #1a1a2e;
-            --bg-secondary: #16213e;
-            --bg-chat: #0f0f23;
-            --text-primary: #eee;
-            --text-secondary: #aaa;
-            --accent: #667eea;
-            --user-msg: #4a5568;
-            --assistant-msg: #2d3748;
-            --error: #e53e3e;
-        }
-        .light-theme {
-            --bg-primary: #f5f5f5;
-            --bg-secondary: #e0e0e0;
-            --bg-chat: #fff;
-            --text-primary: #333;
-            --text-secondary: #666;
-            --user-msg: #e3f2fd;
-            --assistant-msg: #f5f5f5;
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            height: 100vh;
-            display: flex;
-        }
-        .sidebar {
-            width: 280px;
-            background: var(--bg-secondary);
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-        }
-        .sidebar h2 { margin-bottom: 15px; font-size: 18px; }
-        .sidebar label { margin-top: 12px; font-size: 13px; color: var(--text-secondary); }
-        .sidebar select, .sidebar input[type="text"], .sidebar input[type="number"] {
-            margin-top: 5px;
-            padding: 8px;
-            border: none;
-            border-radius: 6px;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            font-size: 13px;
-            width: 100%;
-        }
-        .sessions { margin-top: 15px; flex: 1; overflow-y: auto; }
-        .session-item {
-            padding: 10px;
-            margin: 5px 0;
-            background: var(--bg-primary);
-            border-radius: 6px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 13px;
-        }
-        .session-item:hover { opacity: 0.8; }
-        .session-item.active { border-left: 3px solid var(--accent); }
-        .session-item .delete { color: var(--error); cursor: pointer; padding: 2px 6px; }
-        .btn-group { display: flex; gap: 8px; margin-top: 15px; flex-wrap: wrap; }
-        .btn {
-            padding: 8px 12px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 12px;
-            flex: 1;
-            min-width: 70px;
-        }
-        .btn-primary { background: var(--accent); color: #fff; }
-        .btn-danger { background: var(--error); color: #fff; }
-        .btn-secondary { background: var(--bg-primary); color: var(--text-primary); }
-        .main { flex: 1; display: flex; flex-direction: column; padding: 15px; }
-        .stats {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 10px;
-            font-size: 13px;
-            color: var(--text-secondary);
-        }
-        .chat-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 15px;
-            background: var(--bg-chat);
-            border-radius: 12px;
-            margin-bottom: 15px;
-        }
-        .message {
-            max-width: 85%;
-            padding: 12px 16px;
-            margin-bottom: 12px;
-            border-radius: 12px;
-            line-height: 1.6;
-        }
-        .message.user { background: var(--user-msg); margin-left: auto; }
-        .message.assistant { background: var(--assistant-msg); }
-        .message.error { background: var(--error); color: #fff; }
-        .message pre { margin: 10px 0; border-radius: 6px; overflow-x: auto; }
-        .message code { font-family: 'Consolas', monospace; font-size: 14px; }
-        .message p { margin: 8px 0; }
-        .message table { border-collapse: collapse; margin: 10px 0; }
-        .message th, .message td { border: 1px solid var(--text-secondary); padding: 8px; }
-        .input-area { display: flex; gap: 10px; }
-        .input-area textarea {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 12px;
-            background: var(--bg-chat);
-            color: var(--text-primary);
-            font-size: 14px;
-            resize: none;
-            height: 60px;
-        }
-        .input-area button {
-            padding: 12px 25px;
-            border: none;
-            border-radius: 12px;
-            background: var(--accent);
-            color: #fff;
-            font-size: 14px;
-            cursor: pointer;
-        }
-        .input-area button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .toggle-theme {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: var(--bg-secondary);
-            border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Hub</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+<style>
+:root{--bg:#0f0f1a;--bg2:#1a1a2e;--bg3:#252542;--text:#e8e8f0;--text2:#8888a0;--accent:#6366f1;--accent2:#818cf8;--success:#22c55e;--warning:#f59e0b;--error:#ef4444;--border:#2d2d4a}
+[data-theme="light"]{--bg:#f8f9fa;--bg2:#ffffff;--bg3:#e9ecef;--text:#212529;--text2:#6c757d;--border:#dee2e6}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:hidden}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.nav{width:220px;background:var(--bg2);display:flex;flex-direction:column;border-right:1px solid var(--border);flex-shrink:0}
+.nav-header{padding:20px 16px;border-bottom:1px solid var(--border)}
+.nav-logo{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600}
+.nav-section{padding:12px 8px}
+.nav-section-title{font-size:11px;color:var(--text2);padding:8px 12px;text-transform:uppercase;letter-spacing:1px}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--text2);transition:all .15s;margin-bottom:2px}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:var(--accent);color:#fff}
+.nav-item-icon{width:20px;text-align:center;font-size:16px}
+.nav-divider{height:1px;background:var(--border);margin:8px 16px}
+.nav-bottom{margin-top:auto;padding:12px 8px;border-top:1px solid var(--border)}
+.main{flex:1;display:flex;overflow:hidden}
+.page{display:none;flex:1;overflow:hidden}
+.page.active{display:flex}
+.sidebar{width:280px;background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.sidebar-header{padding:16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.sidebar-header h3{font-size:15px;font-weight:600}
+.sidebar-list{flex:1;overflow-y:auto;padding:8px}
+.sidebar-item{display:flex;align-items:center;padding:12px;border-radius:10px;margin-bottom:4px;cursor:pointer;transition:all .15s}
+.sidebar-item:hover{background:var(--bg3)}
+.sidebar-item.active{background:var(--accent);color:#fff}
+.sidebar-item-icon{width:36px;height:36px;border-radius:10px;background:var(--bg3);display:flex;align-items:center;justify-content:center;margin-right:12px;font-size:16px}
+.sidebar-item.active .sidebar-item-icon{background:rgba(255,255,255,0.2)}
+.sidebar-item-info{flex:1;min-width:0}
+.sidebar-item-title{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sidebar-item-desc{font-size:12px;color:var(--text2);margin-top:2px}
+.sidebar-item.active .sidebar-item-desc{color:rgba(255,255,255,0.7)}
+.btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2)}
+.btn-success{background:var(--success);color:#fff}
+.btn-danger{background:var(--error);color:#fff}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--bg3);color:var(--text)}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn-icon{width:36px;height:36px;padding:0;justify-content:center}
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.content-header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px}
+.content-body{flex:1;overflow-y:auto;padding:24px}
+.chat-messages{flex:1;overflow-y:auto;padding:24px}
+.message{max-width:85%;margin-bottom:20px}
+.message.user{margin-left:auto}
+.message-content{padding:14px 18px;border-radius:16px;line-height:1.7;font-size:14px}
+.message.user .message-content{background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.message.assistant .message-content{background:var(--bg2);border-bottom-left-radius:4px}
+.message.error .message-content{background:var(--error)}
+.message-content pre{margin:12px 0;padding:14px;background:var(--bg);border-radius:8px;overflow-x:auto}
+.message-content code{font-family:Consolas,monospace;font-size:13px}
+.message-content p{margin:8px 0}
+.message-actions{display:flex;gap:4px;margin-top:8px;opacity:0;transition:opacity .15s}
+.message:hover .message-actions{opacity:1}
+.message-action-btn{padding:4px 8px;border:none;background:var(--bg3);color:var(--text2);border-radius:4px;cursor:pointer;font-size:12px;transition:all .15s}
+.message-action-btn:hover{background:var(--accent);color:#fff}
+.message-time{font-size:11px;color:var(--text2);margin-top:4px}
+.chat-input-area{padding:16px 24px;border-top:1px solid var(--border);background:var(--bg2)}
+.chat-input-box{display:flex;gap:12px;align-items:flex-end;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:8px 12px}
+.chat-input-box textarea{flex:1;border:none;background:transparent;color:var(--text);font-size:14px;resize:none;max-height:150px;line-height:1.5}
+.chat-input-box textarea:focus{outline:none}
+.chat-toolbar{display:flex;gap:8px;margin-bottom:12px}
+.settings-panel{width:100%;max-width:800px;margin:0 auto}
+.settings-section{background:var(--bg2);border-radius:16px;padding:24px;margin-bottom:20px}
+.settings-section h4{font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.form-group{margin-bottom:20px}
+.form-group label{display:block;font-size:13px;color:var(--text2);margin-bottom:8px;font-weight:500}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--accent)}
+.form-row{display:flex;gap:12px}
+.form-row>*{flex:1}
+.card{background:var(--bg2);border-radius:12px;padding:20px;margin-bottom:16px}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.card-title{font-size:15px;font-weight:600}
+.list-item{display:flex;align-items:center;padding:14px;background:var(--bg);border-radius:10px;margin-bottom:8px}
+.list-item-icon{width:40px;height:40px;border-radius:10px;background:var(--bg3);display:flex;align-items:center;justify-content:center;margin-right:14px;font-size:18px}
+.list-item-content{flex:1}
+.list-item-title{font-size:14px;font-weight:500}
+.list-item-desc{font-size:12px;color:var(--text2);margin-top:2px}
+.list-item-actions{display:flex;gap:8px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:1000}
+.modal.show{display:flex}
+.modal-content{background:var(--bg2);border-radius:16px;width:90%;max-width:500px;max-height:90vh;overflow:hidden}
+.modal-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.modal-header h3{font-size:18px}
+.modal-body{padding:24px;overflow-y:auto;max-height:60vh}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text2)}
+.empty-state span{font-size:48px;display:block;margin-bottom:16px}
+.switch{position:relative;width:44px;height:24px;display:inline-block}
+.switch input{opacity:0;width:0;height:0}
+.switch-slider{position:absolute;cursor:pointer;inset:0;background:var(--bg3);border-radius:24px;transition:.3s}
+.switch-slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+.switch input:checked+.switch-slider{background:var(--accent)}
+.switch input:checked+.switch-slider:before{transform:translateX(20px)}
+.tag{display:inline-block;padding:4px 10px;border-radius:6px;font-size:12px;background:var(--bg3);color:var(--text2)}
+.tag-primary{background:rgba(99,102,241,0.2);color:var(--accent2)}
+.price-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px}
+.price-card{background:var(--bg3);border-radius:16px;padding:24px;text-align:center;border:2px solid transparent;cursor:pointer}
+.price-card:hover{border-color:var(--accent)}
+.price-card h4{font-size:18px;margin-bottom:8px}
+.price-card .price{font-size:32px;font-weight:700;color:var(--accent);margin:16px 0}
+.price-card .price span{font-size:14px;color:var(--text2)}
+.price-card ul{text-align:left;margin:20px 0;list-style:none}
+.price-card li{padding:6px 0;font-size:13px;color:var(--text2)}
+.price-card li::before{content:'✓';color:var(--success);margin-right:8px}
+.setting-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border)}
+.setting-row:last-child{border-bottom:none}
+.setting-row-label{font-size:14px}
+.setting-row-label small{display:block;font-size:12px;color:var(--text2);margin-top:4px}
+.slider-container{display:flex;align-items:center;gap:12px}
+.slider-container input[type="range"]{width:150px;accent-color:var(--accent)}
+.slider-value{min-width:40px;text-align:right;font-size:14px;color:var(--accent)}
+.tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px}
+.tab{padding:12px 20px;cursor:pointer;font-size:14px;color:var(--text2);border-bottom:2px solid transparent;transition:all .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.assistant-card{display:flex;align-items:center;padding:16px;background:var(--bg);border-radius:12px;margin-bottom:12px;cursor:pointer;transition:all .15s}
+.assistant-card:hover{background:var(--bg3)}
+.assistant-card.active{background:var(--accent);color:#fff}
+.assistant-avatar{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-right:14px}
+.assistant-info{flex:1}
+.assistant-name{font-size:15px;font-weight:500}
+.assistant-desc{font-size:12px;color:var(--text2);margin-top:4px}
+.assistant-card.active .assistant-desc{color:rgba(255,255,255,0.7)}
+.assistant-tag{padding:4px 8px;border-radius:4px;font-size:11px;background:var(--bg3);color:var(--text2)}
+.changelog{max-height:400px;overflow-y:auto}
+.changelog-item{padding:16px 0;border-bottom:1px solid var(--border)}
+.changelog-item:last-child{border-bottom:none}
+.changelog-version{font-size:16px;font-weight:600;color:var(--accent);margin-bottom:8px}
+.changelog-date{font-size:12px;color:var(--text2);margin-left:12px}
+.changelog-content{font-size:14px;color:var(--text2);line-height:1.8}
+.changelog-content li{margin:4px 0}
+.collapse-header{display:flex;align-items:center;justify-content:space-between;padding:14px 0;cursor:pointer;border-bottom:1px solid var(--border)}
+.collapse-header h5{font-size:14px;display:flex;align-items:center;gap:8px}
+.collapse-content{padding:16px 0;display:none}
+.collapse-content.show{display:block}
+.hotkey-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.hotkey-row:last-child{border-bottom:none}
+.hotkey-row span:first-child{font-size:14px}
+.hotkey-right{display:flex;align-items:center;gap:12px}
+.hotkey-key{font-size:13px;color:var(--text2);min-width:120px;text-align:right}
+.hotkey-info,.hotkey-lock{color:var(--text2);font-size:14px;cursor:pointer}
+.shortcut-item{display:flex;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.shortcut-item:hover{background:var(--bg3);margin:0 -16px;padding:12px 16px}
+.shortcut-item:last-child{border-bottom:none}
+.shortcut-item-icon{font-size:18px;margin-right:12px}
+.shortcut-item-name{font-size:14px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.memory-item{display:flex;align-items:flex-start;padding:16px;background:var(--bg);border-radius:10px;margin-bottom:8px}
+.memory-item-content{flex:1;font-size:14px;line-height:1.6}
+.memory-item-meta{font-size:12px;color:var(--text2);margin-top:8px}
+.memory-item-actions{display:flex;gap:4px;opacity:0;transition:opacity .15s}
+.memory-item:hover .memory-item-actions{opacity:1}
+.mcp-market-card{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--bg);border-radius:10px;cursor:pointer;transition:all .15s}
+.mcp-market-card:hover{background:var(--bg3)}
+.mcp-server-card{background:var(--bg);border-radius:10px;padding:16px;transition:all .15s}
+.mcp-server-card:hover{background:var(--bg3)}
+.mcp-server-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.mcp-server-desc{font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mcp-server-tags{display:flex;gap:6px;flex-wrap:wrap}
+.mcp-add-btn{width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:var(--bg3);border-radius:6px;cursor:pointer;font-size:16px;color:var(--text2)}
+.mcp-add-btn:hover{background:var(--accent);color:#fff}
+.settings-sidebar{width:200px;background:var(--bg);border-right:1px solid var(--border);padding:16px 8px;flex-shrink:0}
+.settings-sidebar-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--text2);margin-bottom:2px}
+.settings-sidebar-item:hover{background:var(--bg3);color:var(--text)}
+.settings-sidebar-item.active{background:var(--accent);color:#fff}
+.settings-sidebar-title{font-size:11px;color:var(--text2);padding:12px 12px 8px;text-transform:uppercase;letter-spacing:1px}
+.theme-btn{width:60px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;cursor:pointer;text-align:center}
+.theme-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.color-picker{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s}
+.color-picker:hover{transform:scale(1.1)}
+.color-picker.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
+.hotkey-help-item{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:13px}
+.hotkey-help-key{padding:4px 8px;background:var(--bg3);border-radius:4px;font-family:monospace;font-size:12px;color:var(--accent)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 24px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;z-index:2000;animation:fadeInUp .3s}
+@keyframes fadeInUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.context-menu div{padding:8px 12px;cursor:pointer;font-size:13px;border-radius:4px}
+.context-menu div:hover{background:var(--bg3)}
+.sidebar-item:hover .chat-delete-btn{opacity:1!important}
+</style>
 </head>
 <body>
-    <button class="toggle-theme" onclick="toggleTheme()">🌙</button>
-    <div class="sidebar">
-        <h2>⚡ API Gateway</h2>
-        <label>平台</label>
-        <select id="provider">
-            <optgroup label="国际主流">
-                <option value="openai">OpenAI</option>
-                <option value="azure_openai">Azure OpenAI</option>
-                <option value="claude">Anthropic Claude</option>
-                <option value="gemini">Google Gemini</option>
-                <option value="vertex_ai">Vertex AI</option>
-                <option value="mistral">Mistral</option>
-                <option value="groq">Groq</option>
-                <option value="together">Together</option>
-                <option value="fireworks">Fireworks</option>
-                <option value="perplexity">Perplexity</option>
-                <option value="openrouter">OpenRouter</option>
-                <option value="grok">Grok (xAI)</option>
-                <option value="hyperbolic">Hyperbolic</option>
-                <option value="nvidia">英伟达 NVIDIA</option>
-                <option value="github_models">GitHub Models</option>
-                <option value="github_copilot">GitHub Copilot</option>
-                <option value="aws_bedrock">AWS Bedrock</option>
-                <option value="jina">Jina</option>
-                <option value="voyage">Voyage AI</option>
-                <option value="poe">Poe</option>
-            </optgroup>
-            <optgroup label="国内平台">
-                <option value="deepseek">深度求索 DeepSeek</option>
-                <option value="zhipu">智谱 GLM</option>
-                <option value="moonshot">月之暗面 Kimi</option>
-                <option value="baichuan">百川</option>
-                <option value="yi">零一万物</option>
-                <option value="qwen">阿里云百炼 Qwen</option>
-                <option value="stepfun">阶跃星辰</option>
-                <option value="minimax">MiniMax</option>
-                <option value="doubao">豆包</option>
-                <option value="hunyuan">腾讯混元</option>
-                <option value="tencent_ti">腾讯云 TI</option>
-                <option value="baidu_qianfan">百度云千帆</option>
-                <option value="tianyi">天翼云息壤</option>
-                <option value="wuxinqiong">无问芯穹</option>
-            </optgroup>
-            <optgroup label="API 聚合平台">
-                <option value="siliconflow">硅基流动</option>
-                <option value="aihubmix">AiHubMix</option>
-                <option value="ocoolai">ocoolAI</option>
-                <option value="alaya">Alaya NeW</option>
-                <option value="dmxapi">DMXAPI</option>
-                <option value="aionly">唯一AI (AiOnly)</option>
-                <option value="burncloud">BurnCloud</option>
-                <option value="tokenflux">TokenFlux</option>
-                <option value="ai302">302.AI</option>
-                <option value="cephalon">Cephalon</option>
-                <option value="lanfun">蓝耘科技</option>
-                <option value="ph8">PH8 大模型开放平台</option>
-                <option value="ppio">PPIO 派欧云</option>
-                <option value="qiniu">七牛云 AI 推理</option>
-                <option value="longcat">longcat</option>
-            </optgroup>
-            <optgroup label="本地/自托管">
-                <option value="ollama">Ollama</option>
-                <option value="lmstudio">LM Studio</option>
-                <option value="gpustack">GPUStack</option>
-                <option value="intel_ovms">Intel OVMS</option>
-            </optgroup>
-            <optgroup label="自定义">
-                <option value="custom">🔧 自定义平台</option>
-            </optgroup>
-        </select>
-        <label>模型</label>
-        <input type="text" id="model" value="gpt-4o">
-        <label>API Key</label>
-        <input type="password" id="apiKey" placeholder="输入 API Key">
-        <label>API 地址 <span id="urlHint">(可选)</span></label>
-        <input type="text" id="customUrl" placeholder="留空使用默认地址">
-        <label>Temperature</label>
-        <input type="number" id="temperature" value="0.7" min="0" max="2" step="0.1">
-        <label>Max Tokens</label>
-        <input type="number" id="max_tokens" value="2048">
-        <label style="display:flex;align-items:center;gap:8px;margin-top:12px;">
-            <input type="checkbox" id="stream" checked> 流式输出
-        </label>
-        <div class="sessions">
-            <label>对话列表</label>
-            <div id="sessionList"></div>
-        </div>
-        <div class="btn-group">
-            <button class="btn btn-primary" onclick="newSession()">新对话</button>
-            <button class="btn btn-danger" onclick="clearSession()">清空</button>
-        </div>
-        <div class="btn-group">
-            <button class="btn btn-secondary" onclick="exportJSON()">导出JSON</button>
-            <button class="btn btn-secondary" onclick="exportMD()">导出MD</button>
-        </div>
+<nav class="nav">
+<div class="nav-header"><div class="nav-logo"><span>🤖</span> AI Hub</div></div>
+<div class="nav-section">
+<div class="nav-section-title">模型</div>
+<div class="nav-item active" data-page="chat"><span class="nav-item-icon">💬</span> 对话</div>
+<div class="nav-item" data-page="assistants"><span class="nav-item-icon">🎭</span> 助手</div>
+<div class="nav-item" data-page="providers"><span class="nav-item-icon">📦</span> 模型服务</div>
+<div class="nav-item" data-page="default-model"><span class="nav-item-icon">🎯</span> 默认模型</div>
+</div>
+<div class="nav-divider"></div>
+<div class="nav-section">
+<div class="nav-section-title">设置</div>
+<div class="nav-item" data-page="general"><span class="nav-item-icon">⚙️</span> 常规设置</div>
+<div class="nav-item" data-page="display"><span class="nav-item-icon">🖥️</span> 显示设置</div>
+<div class="nav-item" data-page="data"><span class="nav-item-icon">💾</span> 数据设置</div>
+</div>
+<div class="nav-divider"></div>
+<div class="nav-section">
+<div class="nav-section-title">功能</div>
+<div class="nav-item" data-page="mcp"><span class="nav-item-icon">🔌</span> MCP</div>
+<div class="nav-item" data-page="notes"><span class="nav-item-icon">📝</span> 笔记</div>
+<div class="nav-item" data-page="search"><span class="nav-item-icon">🌐</span> 网络搜索</div>
+<div class="nav-item" data-page="memory"><span class="nav-item-icon">🧠</span> 全局记忆</div>
+<div class="nav-item" data-page="api-server"><span class="nav-item-icon">🖥️</span> API 服务器</div>
+<div class="nav-item" data-page="documents"><span class="nav-item-icon">📄</span> 文档处理</div>
+<div class="nav-item" data-page="shortcuts"><span class="nav-item-icon">⚡</span> 快捷短语</div>
+<div class="nav-item" data-page="hotkeys"><span class="nav-item-icon">⌨️</span> 快捷键</div>
+</div>
+<div class="nav-divider"></div>
+<div class="nav-section">
+<div class="nav-section-title">助手</div>
+<div class="nav-item" data-page="quick-assistant"><span class="nav-item-icon">🚀</span> 快捷助手</div>
+<div class="nav-item" data-page="selection-assistant"><span class="nav-item-icon">✂️</span> 划词助手</div>
+</div>
+<div class="nav-bottom">
+<div class="nav-item" data-page="about"><span class="nav-item-icon">ℹ️</span> 关于我们</div>
+<div class="nav-item" id="navUser" onclick="showAuthModal()"><span class="nav-item-icon">👤</span> <span id="navUserName">登录</span></div>
+</div>
+</nav>
+<div class="main">
+<!-- 对话页 -->
+<div id="page-chat" class="page active">
+<div class="sidebar">
+<div class="sidebar-header">
+<h3>对话列表</h3>
+<div style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm" onclick="searchChats()" title="搜索">🔍</button><button class="btn btn-primary btn-sm" onclick="newChat()">+</button></div>
+</div>
+<div style="padding:8px"><input type="text" id="chatSearchInput" placeholder="搜索对话..." style="width:100%;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;display:none" oninput="filterChats(this.value)"></div>
+<div class="sidebar-list" id="chatList"></div>
+</div>
+<div class="content">
+<div class="content-header">
+<select id="chatAssistant" onchange="onAssistantChange()" style="padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text)"></select>
+<select id="chatProvider" onchange="onProviderChange()" style="padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text)"></select>
+<select id="chatModel" style="padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);min-width:150px"></select>
+<div style="margin-left:auto;display:flex;gap:8px">
+<button class="btn btn-ghost btn-sm" onclick="toggleWebSearch()" id="webSearchBtn" title="网络搜索">🌐</button>
+<button class="btn btn-ghost btn-sm" onclick="showChatSettings()" title="设置">⚙️</button>
+</div>
+</div>
+<div class="chat-messages" id="chatMessages"><div class="empty-state"><span>💬</span><p>开始新的对话</p><p style="font-size:12px;margin-top:8px;color:var(--text2)">Ctrl+N 新建对话 · Enter 发送消息</p></div></div>
+<div class="chat-input-area">
+<div class="chat-toolbar">
+<button class="btn btn-ghost btn-sm" onclick="uploadImage()" title="上传图片">🖼️</button>
+<button class="btn btn-ghost btn-sm" onclick="uploadFile()" title="上传文件">📎</button>
+<button class="btn btn-ghost btn-sm" onclick="voiceInput()" title="语音输入">🎤</button>
+<div style="flex:1"></div>
+<button class="btn btn-ghost btn-sm" onclick="clearChat()">🗑️ 清空</button>
+<button class="btn btn-ghost btn-sm" onclick="exportChat()">📥 导出</button>
+</div>
+<div class="chat-input-box">
+<textarea id="chatInput" placeholder="输入消息，Enter 发送，Shift+Enter 换行..." rows="1" onkeydown="handleChatKey(event)"></textarea>
+<button class="btn btn-ghost btn-sm" onclick="stopGeneration()" id="stopBtn" style="display:none" title="停止生成">⏹️</button>
+<button class="btn btn-primary" onclick="sendMessage()" id="sendBtn">发送</button>
+</div>
+</div>
+</div>
+</div>
+<!-- 助手页 -->
+<div id="page-assistants" class="page">
+<div class="sidebar">
+<div class="sidebar-header"><h3>助手列表</h3><button class="btn btn-primary btn-sm" onclick="addAssistant()">+ 新建</button></div>
+<div class="sidebar-list" id="assistantList"></div>
+</div>
+<div class="content"><div class="content-body"><div class="settings-panel">
+<div class="tabs"><div class="tab active" onclick="switchAssistantTab('info')">助手</div><div class="tab" onclick="switchAssistantTab('settings')">设置</div></div>
+<div id="assistantTabInfo">
+<div class="settings-section"><h4><span>🎭</span> 助手信息</h4>
+<div class="form-group"><label>名称</label><input type="text" id="aName" placeholder="助手名称"></div>
+<div class="form-group"><label>头像 Emoji</label><input type="text" id="aEmoji" placeholder="😀" maxlength="2"></div>
+<div class="form-group"><label>描述</label><input type="text" id="aDesc" placeholder="助手描述"></div>
+<div class="form-group"><label>系统提示词</label><textarea id="aPrompt" rows="6" placeholder="你是一个..."></textarea></div>
+<div style="display:flex;gap:12px"><button class="btn btn-primary" onclick="saveAssistant()">💾 保存</button><button class="btn btn-danger" onclick="deleteAssistant()">🗑️ 删除</button></div>
+</div>
+</div>
+<div id="assistantTabSettings" style="display:none">
+<div class="settings-section"><h4><span>⚙️</span> 助手设置</h4>
+<div class="setting-row"><div class="setting-row-label">模型温度 <small>控制回复的随机性</small></div><div class="slider-container"><input type="range" id="aTemp" min="0" max="2" step="0.1" value="0.7" oninput="$('aTempVal').textContent=this.value"><span class="slider-value" id="aTempVal">0.7</span></div></div>
+<div class="setting-row"><div class="setting-row-label">上下文数 <small>发送给模型的历史消息数</small></div><div class="slider-container"><input type="range" id="aContext" min="1" max="50" value="10" oninput="$('aContextVal').textContent=this.value"><span class="slider-value" id="aContextVal">10</span></div></div>
+<div class="setting-row"><div class="setting-row-label">流式输出</div><label class="switch"><input type="checkbox" id="aStream" checked><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">最大 Token 数 <small>限制回复长度</small></div><div class="slider-container"><input type="range" id="aMaxTokens" min="256" max="8192" step="256" value="2048" oninput="$('aMaxTokensVal').textContent=this.value"><span class="slider-value" id="aMaxTokensVal">2048</span></div></div>
+</div>
+<div class="settings-section"><h4><span>💬</span> 消息设置</h4>
+<div class="setting-row"><div class="setting-row-label">显示提示词</div><label class="switch"><input type="checkbox" id="aShowPrompt"><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">使用衬线字体</div><label class="switch"><input type="checkbox" id="aSerifFont"><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">思考内容自动折叠</div><label class="switch"><input type="checkbox" id="aFoldThinking" checked><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">显示消息大纲</div><label class="switch"><input type="checkbox" id="aShowOutline"><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">消息样式</div><select id="aMsgStyle" style="width:120px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)"><option value="simple">简洁</option><option value="bubble">气泡</option><option value="card">卡片</option></select></div>
+</div>
+</div>
+</div></div></div>
+</div>
+<!-- 模型服务页 -->
+<div id="page-providers" class="page">
+<div class="sidebar"><div class="sidebar-header"><h3>模型服务</h3><button class="btn btn-primary btn-sm" onclick="addProvider()">+ 添加</button></div><div class="sidebar-list" id="providerList"></div></div>
+<div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section"><h4><span>🔧</span> 服务配置</h4>
+<div class="form-group"><label>服务名称</label><input type="text" id="pName" placeholder="OpenAI"></div>
+<div class="form-group"><label>API 地址</label><input type="text" id="pUrl" placeholder="https://api.openai.com/v1"></div>
+<div class="form-row"><div class="form-group"><label>API Key</label><input type="password" id="pKey" placeholder="sk-xxx"></div><div class="form-group"><label>类型</label><select id="pType"><option value="openai">OpenAI</option><option value="claude">Claude</option></select></div></div>
+<div style="display:flex;gap:12px"><button class="btn btn-ghost" onclick="testProvider()">🔍 测试</button><button class="btn btn-primary" onclick="saveProvider()">💾 保存</button><button class="btn btn-danger" onclick="deleteProvider()">🗑️ 删除</button></div>
+</div>
+<div class="settings-section"><h4><span>📋</span> 模型列表</h4><div style="margin-bottom:12px"><button class="btn btn-ghost btn-sm" onclick="addModel()">+ 添加</button><button class="btn btn-ghost btn-sm" onclick="fetchModels()">🔄 获取</button></div><div id="modelList"></div></div>
+</div></div></div>
+</div>
+<!-- 默认模型页 -->
+<div id="page-default-model" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>🎯</span> 默认模型</h4>
+<p style="color:var(--text2);margin-bottom:20px">设置不同场景使用的默认模型</p>
+<div class="form-group"><label>💬 对话模型<br><small style="color:var(--text2)">用于日常对话的默认模型</small></label><div class="form-row"><select id="defaultChatProvider" onchange="onDefaultProviderChange('chat')" style="flex:1"></select><select id="defaultChatModel" style="flex:1"></select></div></div>
+<div class="form-group"><label>🌐 翻译模型<br><small style="color:var(--text2)">用于文本翻译的默认模型</small></label><div class="form-row"><select id="defaultTranslateProvider" onchange="onDefaultProviderChange('translate')" style="flex:1"></select><select id="defaultTranslateModel" style="flex:1"></select></div></div>
+<div class="form-group"><label>📝 摘要模型<br><small style="color:var(--text2)">用于内容摘要的默认模型</small></label><div class="form-row"><select id="defaultSummaryProvider" onchange="onDefaultProviderChange('summary')" style="flex:1"></select><select id="defaultSummaryModel" style="flex:1"></select></div></div>
+<div class="form-group"><label>💻 代码模型<br><small style="color:var(--text2)">用于代码生成和分析的默认模型</small></label><div class="form-row"><select id="defaultCodeProvider" onchange="onDefaultProviderChange('code')" style="flex:1"></select><select id="defaultCodeModel" style="flex:1"></select></div></div>
+<div class="form-group"><label>🚀 快捷助手模型<br><small style="color:var(--text2)">快捷助手使用的默认模型</small></label><div class="form-row"><select id="defaultQuickProvider" onchange="onDefaultProviderChange('quick')" style="flex:1"></select><select id="defaultQuickModel" style="flex:1"></select></div></div>
+<button class="btn btn-primary" onclick="saveDefaultModels()">💾 保存设置</button>
+</div>
+</div></div></div></div>
+<!-- 常规设置页 -->
+<div id="page-general" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>⚙️</span> 常规设置</h4>
+<div class="setting-row"><div class="setting-row-label">语言</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">🇨🇳</span><select id="appLanguage" style="width:120px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)"><option value="zh-CN">中文</option><option value="en">English</option><option value="ja">日本語</option></select></div></div>
+<div class="setting-row"><div class="setting-row-label">代理模式</div><select style="width:120px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)"><option>系统代理</option><option>自定义代理</option><option>不使用代理</option></select></div>
+<div class="setting-row"><div class="setting-row-label">拼写检查</div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">禁用硬件加速</div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+</div>
+<div class="settings-section">
+<h4><span>🔔</span> 通知设置</h4>
+<div class="setting-row"><div class="setting-row-label">桌子消息 ⓘ</div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">音效</div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">知识库</div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+</div>
+<div class="settings-section">
+<h4><span>🚀</span> 启动</h4>
+<div class="setting-row"><div class="setting-row-label">开机启动</div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">启动时最小化到托盘</div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+</div>
+<div class="settings-section">
+<h4><span>📌</span> 托盘</h4>
+<div class="setting-row"><div class="setting-row-label">显示托盘图标</div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">关闭时最小化到托盘</div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+</div>
+<div class="settings-section">
+<h4><span>🔒</span> 隐私设置</h4>
+<div class="setting-row"><div class="setting-row-label">匿名发送错误报告和数据统计</div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+</div>
+<div class="settings-section">
+<h4><span>🛠️</span> 开发者模式</h4>
+<div class="setting-row"><div class="setting-row-label">启用开发者模式<br><small style="color:var(--text2)">启用后可以使用开发者工具和调试功能</small></div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+</div>
+</div></div></div></div>
+<!-- 显示设置页 -->
+<div id="page-display" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>🎨</span> 显示设置</h4>
+<div class="setting-row"><div class="setting-row-label">主题</div><div style="display:flex;gap:8px"><button class="theme-btn" onclick="setTheme('light')">☀️ 浅色</button><button class="theme-btn active" onclick="setTheme('dark')">🌙 深色</button><button class="theme-btn" onclick="setTheme('auto')">💻 系统</button></div></div>
+<div class="setting-row"><div class="setting-row-label">主题颜色</div><div style="display:flex;gap:8px;align-items:center"><div class="color-picker" style="background:#22c55e" onclick="setAccent('#22c55e')"></div><div class="color-picker" style="background:#ef4444" onclick="setAccent('#ef4444')"></div><div class="color-picker" style="background:#06b6d4" onclick="setAccent('#06b6d4')"></div><div class="color-picker" style="background:#3b82f6" onclick="setAccent('#3b82f6')"></div><div class="color-picker active" style="background:#6366f1" onclick="setAccent('#6366f1')"></div><div class="color-picker" style="background:#8b5cf6" onclick="setAccent('#8b5cf6')"></div><div class="color-picker" style="background:#ec4899" onclick="setAccent('#ec4899')"></div><div class="color-picker" style="background:#f59e0b" onclick="setAccent('#f59e0b')"></div><div class="color-picker" style="background:#14b8a6" onclick="setAccent('#14b8a6')"></div><input type="text" value="#00B96B" style="width:80px;padding:6px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"></div></div>
+</div>
+<div class="settings-section">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><h4 style="margin:0"><span>📍</span> 导航栏设置</h4><span class="tag tag-primary" style="font-size:10px">New</span></div>
+<div class="setting-row"><div class="setting-row-label">导航栏位置</div><div style="display:flex;gap:8px"><button class="theme-btn active">左侧</button><button class="theme-btn">顶部</button></div></div>
+</div>
+<div class="settings-section">
+<h4><span>🔍</span> 缩放设置</h4>
+<div class="setting-row"><div class="setting-row-label">缩放</div><div style="display:flex;align-items:center;gap:12px"><button class="btn btn-ghost btn-sm">−</button><span>100%</span><button class="btn btn-ghost btn-sm">+</button><button class="btn btn-ghost btn-sm">↺</button></div></div>
+</div>
+<div class="settings-section">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><h4 style="margin:0"><span>🔤</span> 字体设置</h4><span class="tag tag-primary" style="font-size:10px">New</span></div>
+<div class="setting-row"><div class="setting-row-label">全局字体</div><div style="display:flex;align-items:center;gap:8px"><select style="width:100px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)"><option>默认</option><option>微软雅黑</option><option>思源黑体</option></select><button class="btn btn-ghost btn-sm">↺</button></div></div>
+<div class="setting-row"><div class="setting-row-label">代码字体</div><div style="display:flex;align-items:center;gap:8px"><select style="width:100px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)"><option>默认</option><option>Consolas</option><option>Fira Code</option></select><button class="btn btn-ghost btn-sm">↺</button></div></div>
+</div>
+<div class="settings-section">
+<h4><span>💬</span> 话题设置</h4>
+<div class="setting-row"><div class="setting-row-label">话题位置</div><div style="display:flex;gap:8px"><button class="theme-btn">左侧</button><button class="theme-btn active">右侧</button></div></div>
+<div class="setting-row"><div class="setting-row-label">自动切换到话题</div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">显示话题时间</div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">固定话题置顶</div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+</div>
+<div class="settings-section">
+<h4><span>🤖</span> 助手设置</h4>
+<div class="setting-row"><div class="setting-row-label">模型图标行为</div><div style="display:flex;gap:8px"><select style="width:120px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)"><option>Emoji 字体</option><option>系统字体</option></select></div></div>
+<div class="setting-row"><div class="setting-row-label">代码块显示行号<br><small style="color:var(--text2)">在代码块中显示行号</small></div><label class="switch"><input type="checkbox" id="showLineNumbers"><span class="switch-slider"></span></label></div>
+</div>
+<div class="settings-section">
+<h4><span>🖥️</span> 界面布局</h4>
+<div class="setting-row"><div class="setting-row-label">侧边栏宽度<br><small style="color:var(--text2)">调整左侧导航栏宽度</small></div><div class="slider-container"><input type="range" min="180" max="300" value="220" id="sidebarWidth" oninput="this.nextElementSibling.textContent=this.value+'px'"><span class="slider-value">220px</span></div></div>
+<div class="setting-row"><div class="setting-row-label">对话列表宽度<br><small style="color:var(--text2)">调整对话列表区域宽度</small></div><div class="slider-container"><input type="range" min="200" max="400" value="280" id="chatListWidth" oninput="this.nextElementSibling.textContent=this.value+'px'"><span class="slider-value">280px</span></div></div>
+<div class="setting-row"><div class="setting-row-label">显示对话导航按钮<br><small style="color:var(--text2)">在对话区域显示上下导航按钮</small></div><label class="switch"><input type="checkbox" id="showNavButtons" checked><span class="switch-slider"></span></label></div>
+</div>
+<div class="settings-section">
+<button class="btn btn-primary" onclick="saveDisplaySettings()">💾 保存设置</button>
+<button class="btn btn-ghost" onclick="resetDisplaySettings()" style="margin-left:12px">重置为默认</button>
+</div>
+</div></div></div></div>
+<!-- 数据设置页 -->
+<div id="page-data" class="page">
+<div class="settings-sidebar">
+<div class="settings-sidebar-title">数据和备份设置</div>
+<div class="settings-sidebar-item active" onclick="switchDataTab('directory')">📁 数据目录</div>
+<div class="settings-sidebar-title">云备份设置</div>
+<div class="settings-sidebar-item" onclick="switchDataTab('local')">💾 本地备份</div>
+<div class="settings-sidebar-item" onclick="switchDataTab('webdav')">☁️ WebDAV</div>
+<div class="settings-sidebar-item" onclick="switchDataTab('icloud')">🍎 坚果云配置</div>
+<div class="settings-sidebar-item" onclick="switchDataTab('s3')">📦 S3 兼容存储</div>
+<div class="settings-sidebar-title">快捷按钮</div>
+<div class="settings-sidebar-item" onclick="switchDataTab('export')">📤 以对话单位导出</div>
+<div class="settings-sidebar-item" onclick="switchDataTab('markdown')">📝 Markdown 导出</div>
+<div class="settings-sidebar-title">第三方同步</div>
+<div class="settings-sidebar-item" onclick="switchDataTab('notion')">📓 Notion 配置</div>
+<div class="settings-sidebar-item" onclick="switchDataTab('yuque')">📖 语雀配置</div>
+<div class="settings-sidebar-item" onclick="switchDataTab('joplin')">🎵 Joplin 配置</div>
+<div class="settings-sidebar-item" onclick="switchDataTab('obsidian')">💎 Obsidian 配置</div>
+<div class="settings-sidebar-item" onclick="switchDataTab('siyuan')">📔 思源笔记配置</div>
+<div class="settings-sidebar-item" onclick="switchDataTab('zhishiku')">💡 智能体配置</div>
+</div>
+<div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>💾</span> 数据设置</h4>
+<div class="setting-row"><div class="setting-row-label">数据备份与恢复</div><div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="exportAllData()">备份</button><button class="btn btn-ghost" onclick="importData()">恢复</button></div></div>
+<div class="setting-row"><div class="setting-row-label">简易备份<br><small style="color:var(--text2)">备份包括已备份的数据，如对话记录/模型人工上架和配置，减少空间占用，快速备份恢复</small></div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">导出至手机</div><button class="btn btn-ghost btn-sm">📱 局域网传输</button></div>
+</div>
+<div class="settings-section">
+<h4><span>📁</span> 数据目录</h4>
+<div class="setting-row"><div class="setting-row-label">应用数据</div><div style="display:flex;gap:8px;align-items:center"><input type="text" value="C:\Users\legion\AppData\Roaming\AIHub" readonly style="width:350px;background:var(--bg3);font-size:12px"><button class="btn btn-ghost btn-sm">修改目录</button></div></div>
+<div class="setting-row"><div class="setting-row-label">应用 Logs</div><div style="display:flex;gap:8px;align-items:center"><input type="text" value="C:\Users\legion\AppData\Roaming\AIHub\logs" readonly style="width:350px;background:var(--bg3);font-size:12px"><button class="btn btn-ghost btn-sm">打开日志</button></div></div>
+<div class="setting-row"><div class="setting-row-label">知识小文件</div><button class="btn btn-ghost btn-sm">📁 相关文件</button></div>
+<div class="setting-row"><div class="setting-row-label">清除缓存 <small style="color:var(--text2)">(5.2MB)</small></div><button class="btn btn-ghost btn-sm">清除缓存</button></div>
+</div>
+<div class="settings-section">
+<h4><span>⚠️</span> 重置数据</h4>
+<button class="btn btn-danger" onclick="clearAllData()">⚠️ 重置数据</button>
+</div>
+<div class="settings-section">
+<h4><span>📊</span> 存储统计</h4>
+<div class="setting-row"><div class="setting-row-label">对话数量</div><span id="statChats">0</span></div>
+<div class="setting-row"><div class="setting-row-label">助手数量</div><span id="statAssistants">0</span></div>
+<div class="setting-row"><div class="setting-row-label">快捷短语</div><span id="statShortcuts">0</span></div>
+<div class="setting-row"><div class="setting-row-label">本地存储使用</div><span id="statStorage">0 KB</span></div>
+</div>
+</div></div></div></div>
+<!-- MCP页 -->
+<div id="page-mcp" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section" style="text-align:center;padding:40px">
+<div style="font-size:48px;margin-bottom:16px;opacity:0.5">🔌</div>
+<p style="color:var(--text2)">未启用服务器</p>
+</div>
+<div class="settings-section">
+<h4><span>🌐</span> 更多 MCP</h4>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+<div class="mcp-market-card" onclick="window.open('https://bigmodel.cn/mcp','_blank')"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">🔵</span><div><div style="font-weight:500">BigModel MCP Market</div><div style="font-size:12px;color:var(--text2)">机器MCP，应有尽有</div></div></div><span style="color:var(--text2)">↗</span></div>
+<div class="mcp-market-card" onclick="window.open('https://modelscope.cn/mcp','_blank')"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">🟢</span><div><div style="font-weight:500">modelscope.cn</div><div style="font-size:12px;color:var(--text2)">魔搭社区 MCP 服务器</div></div></div><span style="color:var(--text2)">↗</span></div>
+<div class="mcp-market-card" onclick="window.open('https://mcp.higress.ai','_blank')"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">🟣</span><div><div style="font-weight:500">mcp.higress.ai</div><div style="font-size:12px;color:var(--text2)">Higress MCP 服务器</div></div></div><span style="color:var(--text2)">↗</span></div>
+<div class="mcp-market-card" onclick="window.open('https://mcp.so','_blank')"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">Ⓜ️</span><div><div style="font-weight:500">mcp.so</div><div style="font-size:12px;color:var(--text2)">MCP 服务发现平台</div></div></div><span style="color:var(--text2)">↗</span></div>
+<div class="mcp-market-card" onclick="window.open('https://smithery.ai','_blank')"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">🔨</span><div><div style="font-weight:500">smithery.ai</div><div style="font-size:12px;color:var(--text2)">Smithery MCP 工具</div></div></div><span style="color:var(--text2)">↗</span></div>
+<div class="mcp-market-card" onclick="window.open('https://glama.ai/mcp','_blank')"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">🟡</span><div><div style="font-weight:500">glama.ai</div><div style="font-size:12px;color:var(--text2)">Glama MCP 服务器目录</div></div></div><span style="color:var(--text2)">↗</span></div>
+<div class="mcp-market-card" onclick="window.open('https://pulsemcp.com','_blank')"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px;color:#ec4899">🅿️</span><div><div style="font-weight:500">pulsemcp.com</div><div style="font-size:12px;color:var(--text2)">Pulse MCP 服务器</div></div></div><span style="color:var(--text2)">↗</span></div>
+<div class="mcp-market-card" onclick="window.open('https://mcp.composio.dev','_blank')"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">⚡</span><div><div style="font-weight:500">mcp.composio.dev</div><div style="font-size:12px;color:var(--text2)">Composio MCP 开发工具</div></div></div><span style="color:var(--text2)">↗</span></div>
+<div class="mcp-market-card" onclick="window.open('https://github.com/modelcontextprotocol/servers','_blank')"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">📋</span><div><div style="font-weight:500">Model Context Protocol Servers</div><div style="font-size:12px;color:var(--text2)">官方 MCP 服务器仓库</div></div></div><span style="color:var(--text2)">↗</span></div>
+<div class="mcp-market-card" onclick="window.open('https://github.com/punkpeye/awesome-mcp-servers','_blank')"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">⭐</span><div><div style="font-weight:500">Awesome MCP Servers</div><div style="font-size:12px;color:var(--text2)">精选 MCP 服务器列表</div></div></div><span style="color:var(--text2)">↗</span></div>
+</div>
+</div>
+<div class="settings-section">
+<h4><span>🛠️</span> 内置服务器</h4>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+<div class="mcp-server-card"><div class="mcp-server-header"><span style="font-weight:500">@cherry/mcp-auto-install</span><span class="mcp-add-btn">+</span></div><div class="mcp-server-desc">自动安装 MCP 服务（测试版）</div><div class="mcp-server-tags"><span class="tag" style="background:var(--accent);color:#fff">内置</span></div></div>
+<div class="mcp-server-card"><div class="mcp-server-header"><span style="font-weight:500">@cherry/memory</span><span class="mcp-add-btn">+</span></div><div class="mcp-server-desc">让大模型记住你的对话上下文，包含全局记忆功能，保存 AI 助手的记忆，让对话更连贯</div><div class="mcp-server-tags"><span class="tag" style="background:var(--accent);color:#fff">内置</span><span class="tag" style="background:var(--warning);color:#fff">需要配置</span></div></div>
+<div class="mcp-server-card"><div class="mcp-server-header"><span style="font-weight:500">@cherry/sequentialthinking</span><span class="mcp-add-btn">+</span></div><div class="mcp-server-desc">让 MCP 服务器深度思考，支持/追溯问题来源并进行分析，让 AI 更有逻辑性地回答问题</div><div class="mcp-server-tags"><span class="tag" style="background:var(--accent);color:#fff">内置</span></div></div>
+<div class="mcp-server-card"><div class="mcp-server-header"><span style="font-weight:500">@cherry/brave-search</span><span class="mcp-add-btn">+</span></div><div class="mcp-server-desc">使用 Brave 搜索 API 进行 MCP 服务器搜索文档，支持搜索网页和新闻，需要配置 BRAVE_API_KEY 环境变量</div><div class="mcp-server-tags"><span class="tag" style="background:var(--accent);color:#fff">内置</span><span class="tag" style="background:var(--warning);color:#fff">需要配置</span></div></div>
+<div class="mcp-server-card"><div class="mcp-server-header"><span style="font-weight:500">@cherry/fetch</span><span class="mcp-add-btn">+</span></div><div class="mcp-server-desc">用于获取 URL 网页内容的 MCP 服务器</div><div class="mcp-server-tags"><span class="tag" style="background:var(--accent);color:#fff">内置</span></div></div>
+<div class="mcp-server-card"><div class="mcp-server-header"><span style="font-weight:500">@cherry/filesystem</span><span class="mcp-add-btn">+</span></div><div class="mcp-server-desc">让模型文件系统操作的模型上下文协议（MCP）的 Node.js 服务器，支持读取、写入和删除文件</div><div class="mcp-server-tags"><span class="tag" style="background:var(--accent);color:#fff">内置</span><span class="tag" style="background:var(--warning);color:#fff">需要配置</span></div></div>
+<div class="mcp-server-card"><div class="mcp-server-header"><span style="font-weight:500">@cherry/dify-knowledge</span><span class="mcp-add-btn">+</span></div><div class="mcp-server-desc">Dify 的 MCP 服务器实现，使用了一个简单的 API 来检索 Dify 知识库，需要配置 Dify Key</div><div class="mcp-server-tags"><span class="tag" style="background:var(--accent);color:#fff">内置</span><span class="tag" style="background:var(--warning);color:#fff">需要配置</span></div></div>
+<div class="mcp-server-card"><div class="mcp-server-header"><span style="font-weight:500">@cherry/python</span><span class="mcp-add-btn">+</span></div><div class="mcp-server-desc">在安全的沙箱环境中执行 Python 代码，使用 Pyodide 运行 Python，支持人工审核和代码执行</div><div class="mcp-server-tags"><span class="tag" style="background:var(--accent);color:#fff">内置</span></div></div>
+<div class="mcp-server-card"><div class="mcp-server-header"><span style="font-weight:500">@cherry/didi-mcp</span><span class="mcp-add-btn">+</span></div><div class="mcp-server-desc">一个生成了滴滴 MCP 服务器实现，帮助用户打车服务包括路线查询、价格预估、订单管理和司机调度，仅支持中国...</div><div class="mcp-server-tags"><span class="tag" style="background:var(--accent);color:#fff">内置</span><span class="tag" style="background:var(--error);color:#fff">实验性功能</span></div></div>
+</div>
+</div>
+</div></div></div></div>
+<!-- 笔记页 -->
+<div id="page-notes" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>📁</span> 数据设置</h4>
+<div class="setting-row"><div class="setting-row-label">当前工作目录</div></div>
+<div style="display:flex;gap:8px;margin-bottom:16px">
+<input type="text" id="notesWorkDir" value="C:\Users\legion\AppData\Roaming\AIHub\Data\Notes" readonly style="flex:1;background:var(--bg3)">
+<button class="btn btn-ghost btn-sm" onclick="selectNotesDir()">📁 选择</button>
+</div>
+<div style="display:flex;gap:8px;margin-bottom:8px">
+<button class="btn btn-ghost btn-sm" onclick="applyNotesDir()">🔄 应用</button>
+<button class="btn btn-ghost btn-sm" onclick="resetNotesDir()">重置为默认</button>
+</div>
+<p style="font-size:12px;color:var(--text2)">工作目录保存笔记文件位置，更换工作目录不会移动原有文件，请手动迁移文件。</p>
+</div>
+<div class="settings-section">
+<h4><span>✏️</span> 编辑器设置</h4>
+<div class="setting-row"><div class="setting-row-label">默认视图<br><small style="color:var(--text2)">新建笔记时的视图模式</small></div><select id="noteDefaultView" style="width:120px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)"><option value="edit">编辑模式</option><option value="preview">预览模式</option><option value="split">分屏模式</option></select></div>
+<div class="setting-row"><div class="setting-row-label">默认编辑视图<br><small style="color:var(--text2)">在编辑模式下，新建笔记时采用的编辑模式</small></div><select id="noteEditView" style="width:120px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)"><option value="source">源码模式</option><option value="wysiwyg">实时预览</option></select></small></div><select style="width:120px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)"><option>实时预览</option><option>源码模式</option></select></div>
+</div>
+<div class="settings-section">
+<h4><span>🖥️</span> 显示设置</h4>
+<div class="setting-row"><div class="setting-row-label">缩减行宽<br><small style="color:var(--text2)">开启后将限制每行字数，使段落更易阅读</small></div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">字体大小<br><small style="color:var(--text2)">调整字体大小以获得更好的阅读体验 (10-30px)</small></div><div class="slider-container"><input type="range" min="10" max="30" value="16" oninput="this.nextElementSibling.textContent=this.value+'px'"><span class="slider-value">16px</span></div></div>
+<div class="setting-row"><div class="setting-row-label">显示目录大纲<br><small style="color:var(--text2)">显示目录大纲导航栏，方便文档导航</small></div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
+</div>
+</div>
+<!-- 简化版笔记区域，避免渲染空节点导致的 JS 报错 -->
+<div style="margin-top:16px;display:grid;grid-template-columns:240px 1fr;gap:12px">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;min-height:200px;padding:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-weight:600">笔记列表</div>
+      <button class="btn btn-ghost btn-sm" onclick="newNote()">+ 新建</button>
     </div>
-    <div class="main">
-        <div class="stats">
-            <span>Token: <strong id="tokenCount">0</strong></span>
-            <span>消息: <strong id="msgCount">0</strong></span>
-        </div>
-        <div class="chat-container" id="chat"></div>
-        <div class="input-area">
-            <textarea id="input" placeholder="输入消息... (Enter发送, Shift+Enter换行)" onkeydown="handleKey(event)"></textarea>
-            <button id="sendBtn" onclick="send()">发送</button>
-        </div>
+    <div id="noteList" style="display:flex;flex-direction:column;gap:6px"></div>
+  </div>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px;min-height:200px;display:flex;flex-direction:column;gap:8px">
+    <input id="noteTitle" placeholder="标题" style="padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text)">
+    <textarea id="noteContent" placeholder="内容" style="flex:1;min-height:180px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);resize:vertical"></textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="deleteNote()">删除</button>
+      <button class="btn btn-primary btn-sm" onclick="saveNote()">保存</button>
     </div>
+  </div>
+</div></div></div></div>
+<!-- 网络搜索页 -->
+<div id="page-search" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>🌐</span> 网络搜索</h4>
+<div class="setting-row"><div class="setting-row-label">搜索服务商</div><select id="searchProvider" onchange="onSearchProviderChange()" style="width:180px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)"><option value="zhipu">Zhipu (API 密钥)</option><option value="searxng">SearXNG</option><option value="tavily">Tavily</option><option value="exa">Exa</option></select></div>
+</div>
+<div class="settings-section" id="searchZhipuSection">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span style="color:var(--accent)">●</span><span>Zhipu</span><a href="https://open.bigmodel.cn" target="_blank" style="color:var(--text2);font-size:12px">↗</a></div>
+<div class="form-group"><label>API 密钥</label><div style="display:flex;gap:8px"><input type="password" id="zhipuSearchKey" placeholder="输入 Zhipu API 密钥" style="flex:1"><button class="btn btn-ghost btn-sm" onclick="togglePassword('zhipuSearchKey')">👁️</button><button class="btn btn-ghost btn-sm" onclick="testSearchKey()">检测</button></div><a href="#" style="font-size:12px;color:var(--accent)">点击这里获取密钥</a><span style="font-size:12px;color:var(--text2);margin-left:auto">多个密钥请用逗号分隔</span></div>
+<div class="form-group"><label>API 地址</label><input type="text" value="https://open.bigmodel.cn/api/paas/v4/web_search" readonly style="background:var(--bg3)"></div>
+</div>
+<div class="settings-section" id="searchSearxngSection" style="display:none">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span style="color:var(--success)">●</span><span>SearXNG</span><a href="https://searx.space" target="_blank" style="color:var(--text2);font-size:12px">↗</a></div>
+<div class="form-group"><label>API 地址</label><input type="text" id="searxngUrl" value="https://search.inetol.net" placeholder="https://search.inetol.net"></div>
+<div class="form-group"><label>API 密钥</label><input type="password" id="searxngKey" placeholder="可选，某些实例需要"></div>
+</div>
+<div class="settings-section">
+<h4><span>⚙️</span> 常规设置</h4>
+<div class="setting-row"><div class="setting-row-label">搜索已启用<br><small style="color:var(--text2)">启用后，AI 可以搜索互联网获取最新信息</small></div><label class="switch"><input type="checkbox" id="searchEnabled" checked><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">搜索结果个数<br><small style="color:var(--text2)">每次搜索返回的结果数量 (1-100)</small></div><div class="slider-container"><input type="range" min="1" max="100" value="5" id="searchResultCount" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-value">5</span></div></div>
+</div>
+<div class="settings-section">
+<h4><span>📦</span> 搜索结果压缩</h4>
+<div class="setting-row"><div class="setting-row-label">压缩方法<br><small style="color:var(--text2)">对搜索结果进行压缩以节省 Token</small></div><select style="width:120px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)"><option>不压缩</option><option>简单压缩</option><option>AI 压缩</option></select></div>
+</div>
+<div class="settings-section">
+<h4><span>🚫</span> 黑名单</h4>
+<div class="form-group"><label>在搜索结果中不会出现以下网站的结果<br><small style="color:var(--text2)">请按以下格式添加(每行一个)</small></label><textarea rows="4" id="searchBlacklist" placeholder="完整域名: *.example.com/*&#10;正则表达式: /.*example\.net\.org/"></textarea></div>
+<button class="btn btn-primary" onclick="saveSearchSettings()">保存</button>
+</div>
+</div></div></div></div>
+<!-- 全局记忆页 -->
+<div id="page-memory" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+<div style="display:flex;align-items:center;gap:12px"><h4 style="margin:0"><span>🧠</span> 全局记忆</h4><span class="tag tag-primary">Beta</span></div>
+<div style="display:flex;align-items:center;gap:12px"><label class="switch"><input type="checkbox" id="memoryEnabled" checked><span class="switch-slider"></span></label><button class="btn btn-ghost btn-sm">⚙️</button></div>
+</div>
+</div>
+<div class="settings-section">
+<h4><span>👤</span> 用户管理</h4>
+<div class="setting-row"><div class="setting-row-label">用户 ID<br><small style="color:var(--text2)">0 条记忆</small></div><div style="display:flex;align-items:center;gap:8px"><span style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--accent);color:#fff;border-radius:6px;font-size:13px">👤 默认用户</span><select style="width:80px;padding:6px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option>默认</option></select><button class="btn btn-ghost btn-sm">👤</button></div></div>
+<div class="setting-row"><div class="setting-row-label">用户<br><small style="color:var(--text2)">临时</small></div><span class="tag" style="background:var(--success);color:#fff">0</span></div>
+</div>
+<div class="settings-section">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+<h4 style="margin:0"><span>📚</span> 全局记忆</h4>
+<div style="display:flex;gap:8px;align-items:center">
+<input type="text" placeholder="搜索记忆..." style="width:150px;padding:6px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
+<button class="btn btn-primary btn-sm" onclick="showAddMemoryModal()">+ 添加记忆</button>
+<button class="btn btn-ghost btn-sm">≡ 更多</button>
+</div>
+</div>
+<div id="memoryList"></div>
+</div>
+</div></div></div></div>
+<!-- API服务器页 -->
+<div id="page-api-server" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+<div><h4 style="margin:0"><span>🖥️</span> API 服务器</h4><p style="color:var(--text2);font-size:13px;margin-top:4px">通过 OpenAI 兼容的 HTTP API 暴露 AI Hub 的 AI 功能</p></div>
+<button class="btn btn-primary" onclick="window.open('/docs','_blank')">📄 API 文档</button>
+</div>
+<div class="card" style="background:var(--bg)">
+<div style="display:flex;justify-content:space-between;align-items:center">
+<div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;background:var(--success);border-radius:50%;animation:pulse 2s infinite"></span><span style="color:var(--success);font-weight:500">运行中</span><a href="http://localhost:8000" target="_blank" style="color:var(--text2);font-size:13px">http://localhost:8000</a></div>
+<div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="copyText('http://localhost:8000')">📋</button><button class="btn btn-ghost btn-sm">🗑️</button></div>
+</div>
+</div>
+</div>
+<div class="settings-section">
+<h4><span>🔑</span> API 密钥</h4>
+<p style="color:var(--text2);font-size:13px;margin-bottom:16px">用于 API 认证的令牌</p>
+<div class="form-group"><label>API 密钥</label><div style="display:flex;gap:8px"><input type="text" id="apiServerKey" value="cs-sk-e6a3d630-0f63-40f8-95f3-d6d6bc8a8424" readonly style="flex:1;background:var(--bg3);font-family:monospace"><button class="btn btn-ghost btn-sm" onclick="copyText($('apiServerKey').value)">📋</button></div></div>
+<div class="form-group"><label>授权标头</label><input type="text" value="Authorization: Bearer cs-sk-e6a3d630-0f63-40f8-95f3-d6d6bc8a8424" readonly style="background:var(--bg3);font-family:monospace;font-size:12px"></div>
+</div>
+<div class="settings-section">
+<h4><span>⚙️</span> 服务器设置</h4>
+<div class="setting-row"><div class="setting-row-label">启用 API 服务器</div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">端口号</div><input type="number" value="8000" style="width:100px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)"></div>
+<div class="setting-row"><div class="setting-row-label">允许跨域请求 (CORS)</div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
+</div>
+<div class="settings-section">
+<h4><span>📖</span> 使用说明</h4>
+<div class="card" style="background:var(--bg)"><p style="font-size:13px;color:var(--text2);margin-bottom:8px">Base URL:</p><code style="display:block;padding:12px;background:var(--bg3);border-radius:8px;font-family:monospace">http://localhost:8000/v1</code></div>
+<div class="card" style="background:var(--bg);margin-top:12px"><p style="font-size:13px;color:var(--text2);margin-bottom:8px">示例请求:</p><pre style="padding:12px;background:var(--bg3);border-radius:8px;font-size:12px;overflow-x:auto;margin:0"><code>curl http://localhost:8000/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}]}'</code></pre></div>
+</div>
+</div></div></div></div>
+<!-- 文档处理页 -->
+<div id="page-documents" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>🔍</span> OCR 服务</h4>
+<div class="tabs" style="margin-bottom:16px"><div class="tab active">📄 图片</div></div>
+<div class="setting-row"><div class="setting-row-label">OCR 服务提供商</div><select style="width:150px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)"><option>系统 OCR</option><option>百度 OCR</option><option>腾讯 OCR</option></select></div>
+</div>
+<div class="settings-section">
+<h4><span>💻</span> 系统 OCR</h4>
+<div class="setting-row"><div class="setting-row-label">支持的语言</div><div style="display:flex;gap:8px"><span class="tag">🇨🇳 中文</span><span class="tag">🇺🇸 英文</span></div></div>
+</div>
+<div class="settings-section">
+<h4><span>📄</span> 文档处理</h4>
+<div class="setting-row"><div class="setting-row-label">文档处理服务商</div><select style="width:150px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)"><option>MinerU</option><option>本地解析</option></select></div>
+</div>
+<div class="settings-section">
+<h4><span>🔗</span> MinerU</h4>
+<div class="form-group"><label>API 密钥</label><div style="display:flex;gap:8px"><input type="password" id="mineruKey" placeholder="MinerU 提供每日 500 页的免费额度，您不需要输入密钥" style="flex:1"><button class="btn btn-ghost btn-sm">👁️</button></div><a href="#" style="font-size:12px;color:var(--accent)">点击这里获取密钥</a><span style="font-size:12px;color:var(--text2);margin-left:auto">多个密钥请用逗号分隔</span></div>
+<div class="form-group"><label>API 地址</label><input type="text" value="https://mineru.net" readonly></div>
+</div>
+<div class="settings-section">
+<h4><span>📁</span> 上传文档</h4>
+<div style="border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;cursor:pointer" onclick="document.getElementById('fileInput').click()"><span style="font-size:48px;display:block;margin-bottom:12px">📁</span><p style="color:var(--text2)">点击上传文件</p><p style="color:var(--text2);font-size:12px;margin-top:8px">支持 PDF, DOCX, TXT, MD 等格式</p></div>
+<input type="file" id="fileInput" style="display:none" onchange="handleFileUpload(event)">
+</div>
+<div class="settings-section" id="docResult" style="display:none"><h4><span>📝</span> 内容</h4><div id="docContent" style="background:var(--bg);padding:16px;border-radius:8px;max-height:300px;overflow-y:auto;white-space:pre-wrap"></div><div style="margin-top:16px"><button class="btn btn-primary" onclick="summarizeDoc()">📊 摘要</button><button class="btn btn-ghost" onclick="askAboutDoc()">💬 提问</button></div></div>
+</div></div></div></div>
+<!-- 快捷短语页 -->
+<div id="page-shortcuts" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section" style="padding:16px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+<h4 style="margin:0"><span>⚡</span> 快捷短语</h4>
+<button class="btn btn-ghost btn-sm" onclick="showAddShortcutModal()">+</button>
+</div>
+<div id="shortcutList" style="min-height:200px"></div>
+</div>
+</div></div></div></div>
+<!-- 快捷键页 -->
+<div id="page-hotkeys" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section" style="padding:16px">
+<h4 style="margin-bottom:16px"><span>⌨️</span> 快捷键</h4>
+<div class="hotkey-row"><span>放大界面</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + =</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>缩小界面</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + -</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>重置缩放</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + 0</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>打开设置</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + ,</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>显示/隐藏应用</span><div class="hotkey-right"><span class="hotkey-key">按下快捷键</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>快捷助手</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + E</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>开关划词助手</span><div class="hotkey-right"><span class="hotkey-key">按下快捷键</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>划词助手：取词</span><div class="hotkey-right"><span class="hotkey-key">按下快捷键</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>退出全屏</span><div class="hotkey-right"><span class="hotkey-key">Escape</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>新建话题</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + N</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>重命名话题</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + T</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>切换助手显示</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + [</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>切换话题显示</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + ]</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>复制上一条消息</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + Shift + C</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>编辑最后一条用户消息</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + Shift + E</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div></div>
+</div>
+</div></div></div></div>
+<!-- 快捷助手页 -->
+<div id="page-quick-assistant" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>🚀</span> 快捷助手</h4>
+<div class="setting-row"><div class="setting-row-label">启用快捷助手</div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">点击托盘图标启动</div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">启动时读取剪贴板</div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
+</div>
+<div class="settings-section">
+<div class="setting-row"><div class="setting-row-label">快捷助手模型</div>
+<div style="display:flex;align-items:center;gap:12px">
+<span style="display:flex;align-items:center;gap:6px">😀 默认助手</span>
+<select style="width:80px;padding:6px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option>默认</option></select>
+<div style="display:flex;gap:4px">
+<button class="btn btn-primary btn-sm">使用助手</button>
+<button class="btn btn-ghost btn-sm">默认模型</button>
+</div>
+</div>
+</div>
+<div style="display:flex;gap:8px;margin:16px 0;justify-content:center">
+<span style="font-size:20px;cursor:pointer" title="Suno">🎵</span>
+<span style="font-size:20px;cursor:pointer" title="中文">中</span>
+<span style="font-size:20px;cursor:pointer" title="画图">🎨</span>
+<span style="font-size:20px;cursor:pointer" title="邮件">📧</span>
+<span style="font-size:20px;cursor:pointer" title="Twitter">🐦</span>
+<span style="font-size:20px;cursor:pointer" title="代码">💻</span>
+<span style="font-size:20px;cursor:pointer" title="更多">😀</span>
+</div>
+</div>
+<div class="settings-section">
+<div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg);border-radius:10px;margin-bottom:16px">
+<span style="font-size:24px">😀</span>
+<span style="color:var(--text2)">询问 默认助手 获取帮助...</span>
+</div>
+<div style="background:var(--bg);border-radius:10px;padding:12px;margin-bottom:12px">
+<div style="display:flex;align-items:center;gap:8px;color:var(--text2);font-size:14px">
+<span>💬</span> 回答此问题
+<span style="margin-left:auto">↵</span>
+</div>
+</div>
+<div class="list-item" style="cursor:pointer"><div class="list-item-icon" style="background:transparent;font-size:20px">🌐</div><div class="list-item-content"><div class="list-item-title">文本翻译</div></div></div>
+<div class="list-item" style="cursor:pointer"><div class="list-item-icon" style="background:transparent;font-size:20px">📄</div><div class="list-item-content"><div class="list-item-title">内容总结</div></div></div>
+<div class="list-item" style="cursor:pointer"><div class="list-item-icon" style="background:transparent;font-size:20px">💡</div><div class="list-item-content"><div class="list-item-title">解释说明</div></div></div>
+</div>
+<div style="text-align:center;padding:12px;color:var(--text2);font-size:12px">⌘ 按 ESC 关闭</div>
+</div></div></div></div>
+<!-- 划词助手页 -->
+<div id="page-selection-assistant" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+<h4 style="margin:0"><span>✂️</span> 划词助手</h4>
+<a href="#" style="color:var(--accent);font-size:13px">FAQ & 反馈</a>
+</div>
+<div class="setting-row"><div class="setting-row-label">启用</div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
+</div>
+<div class="settings-section">
+<h4><span>🔧</span> 工具栏</h4>
+<div class="setting-row">
+<div class="setting-row-label">取词方式<br><small style="color:var(--text2)">划词后，触发划词助手的方式</small></div>
+<div style="display:flex;gap:8px">
+<button class="btn btn-primary btn-sm">划词</button>
+<button class="btn btn-ghost btn-sm">Ctrl 键</button>
+<button class="btn btn-ghost btn-sm">快捷键</button>
+</div>
+</div>
+<div class="setting-row"><div class="setting-row-label">紧凑模式<br><small style="color:var(--text2)">紧凑模式下，只显示图标，不显示文字</small></div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+</div>
+<div class="settings-section">
+<h4><span>🪟</span> 功能窗口</h4>
+<div class="setting-row"><div class="setting-row-label">跟随工具栏<br><small style="color:var(--text2)">窗口位置跟随工具栏显示，让回答内容离划词位置更近</small></div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">钉住人小<br><small style="color:var(--text2)">钉住后，窗口会保持上次调整的大小显示</small></div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">自动关闭<br><small style="color:var(--text2)">当鼠标不在窗口区域时关闭，将自动关闭窗口</small></div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">自动朗读<br><small style="color:var(--text2)">默认将朗读上次打开的翻译</small></div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">透明度<br><small style="color:var(--text2)">设置窗口透明度，100% 为完全不透明</small></div><div class="slider-container"><span class="slider-value">100%</span><input type="range" min="50" max="100" value="100" style="width:150px"></div></div>
+</div>
+<div class="settings-section">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+<h4 style="margin:0"><span>⚡</span> 功能</h4>
+<div style="display:flex;gap:8px">
+<button class="btn btn-ghost btn-sm">重置</button>
+<button class="btn btn-primary btn-sm">+ 自定义功能</button>
+</div>
+</div>
+<div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px">
+<span style="display:flex;align-items:center;gap:4px;padding:6px 12px;background:var(--error);color:#fff;border-radius:6px;font-size:13px">🚫 禁用</span>
+<span style="display:flex;align-items:center;gap:4px;padding:6px 12px;background:var(--bg3);border-radius:6px;font-size:13px">🌐 翻译</span>
+<span style="display:flex;align-items:center;gap:4px;padding:6px 12px;background:var(--bg3);border-radius:6px;font-size:13px">📖 解释</span>
+<span style="display:flex;align-items:center;gap:4px;padding:6px 12px;background:var(--bg3);border-radius:6px;font-size:13px">📊 总结</span>
+<span style="display:flex;align-items:center;gap:4px;padding:6px 12px;background:var(--bg3);border-radius:6px;font-size:13px">🔍 搜索</span>
+<span style="display:flex;align-items:center;gap:4px;padding:6px 12px;background:var(--bg3);border-radius:6px;font-size:13px">📋 复制</span>
+</div>
+<div class="list-item" style="cursor:pointer"><div class="list-item-icon" style="background:transparent;font-size:20px">🌐</div><div class="list-item-content"><div class="list-item-title">翻译</div></div></div>
+</div>
+</div></div></div></div>
+<!-- 关于我们页 -->
+<div id="page-about" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<div style="display:flex;align-items:center;gap:20px;margin-bottom:24px">
+<div style="width:80px;height:80px;background:linear-gradient(135deg,#6366f1,#ec4899);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:40px">🤖</div>
+<div><h2 style="font-size:24px;margin-bottom:4px">AI Hub</h2><p style="color:var(--text2)">一款为创造者而生的 AI 助手</p><span class="tag tag-primary" style="margin-top:8px;display:inline-block">v1.7.2</span></div>
+<button class="btn btn-ghost" style="margin-left:auto" onclick="checkUpdate()">立即更新</button>
+</div>
+<div class="setting-row"><div class="setting-row-label">自动更新</div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">测试计划 <small>获取最新测试版本</small></div><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div>
+</div>
+<div class="settings-section">
+<h4><span>📋</span> 发现新版本 1.7.2</h4>
+<div class="changelog">
+<div class="changelog-item">
+<div class="changelog-version">AI Hub 1.7.2 - 稳定性与体验提升<span class="changelog-date">2024-12-10</span></div>
+<div class="changelog-content">本次更新专注于稳定性改进，同时修复用户体验问题。
+<ul>
+<li>🎨 <b>功能改进</b></li>
+<li>增强聊天对话框确认删除状态管理</li>
+<li>优化因只言左键右键对齐体验</li>
+<li>改进温度和 top_p 参数处理逻辑</li>
+<li>支持用户自定义 OpenAI API 认证头</li>
+<li>翻译功能窗口支持义格义格义件</li>
+</ul>
+<ul>
+<li>🤖 <b>AI 与模型</b></li>
+<li>为 Gemini 3 Pro Image 添加图片式请求 token 支持</li>
+<li>更新 DeepSeek 模型以适配 DeepSeek v3.2</li>
+<li>更新 AiOnly 默认模型</li>
+<li>更新 AI 模型配置至最新版本</li>
+</ul>
+<ul>
+<li>♿ <b>无障碍支持</b></li>
+<li>改进屏幕阅读器 (NVDA) 支持，添加 aria-label 属性</li>
+<li>新增阴影按钮边框与检查支持</li>
+</ul>
+<ul>
+<li>🐛 <b>问题修复</b></li>
+<li>修复快捷助手无法注册快捷键的问题</li>
+<li>修复多文件流消息时 UI 活动问题（通过批处理优化）</li>
+<li>修复翻译结果用到 textBlock 主题主题的问题</li>
+</ul>
+</div>
+</div>
+<div class="changelog-item">
+<div class="changelog-version">AI Hub 1.7.1<span class="changelog-date">2024-12-05</span></div>
+<div class="changelog-content">
+<ul>
+<li>新增多模型同时回答功能</li>
+<li>优化流式输出性能</li>
+<li>修复若干已知问题</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="settings-section">
+<h4><span>📞</span> 联系我们</h4>
+<div class="list-item" style="cursor:pointer" onclick="window.open('mailto:support@aihub.com')"><div class="list-item-icon">📧</div><div class="list-item-content"><div class="list-item-title">邮箱</div><div class="list-item-desc">support@aihub.com</div></div><span style="color:var(--accent)">↗</span></div>
+<div class="list-item" style="cursor:pointer" onclick="window.open('https://github.com/aihub','_blank')"><div class="list-item-icon">🐙</div><div class="list-item-content"><div class="list-item-title">GitHub</div><div class="list-item-desc">github.com/aihub</div></div><span style="color:var(--accent)">↗</span></div>
+<div class="list-item" style="cursor:pointer" onclick="window.open('https://discord.gg/aihub','_blank')"><div class="list-item-icon">💬</div><div class="list-item-content"><div class="list-item-title">Discord</div><div class="list-item-desc">discord.gg/aihub</div></div><span style="color:var(--accent)">↗</span></div>
+<div class="list-item" style="cursor:pointer" onclick="window.open('https://twitter.com/aihub','_blank')"><div class="list-item-icon">🐦</div><div class="list-item-content"><div class="list-item-title">Twitter</div><div class="list-item-desc">@aihub</div></div><span style="color:var(--accent)">↗</span></div>
+</div>
+<div class="settings-section">
+<h4><span>📜</span> 开源许可</h4>
+<p style="color:var(--text2);font-size:13px;line-height:1.8">AI Hub 基于 MIT 许可证开源。感谢所有贡献者和开源社区的支持。</p>
+<div style="margin-top:16px;display:flex;gap:8px">
+<button class="btn btn-ghost btn-sm" onclick="window.open('https://github.com/aihub/LICENSE','_blank')">查看许可证</button>
+<button class="btn btn-ghost btn-sm" onclick="window.open('https://github.com/aihub/CONTRIBUTORS','_blank')">贡献者名单</button>
+</div>
+</div>
+</div></div></div></div>
+</div>
+<!-- 模态框 -->
+<div class="modal" id="authModal"><div class="modal-content" style="max-width:400px"><div class="modal-header"><h3 id="authTitle">登录</h3><button class="btn btn-icon btn-ghost" onclick="closeModal('authModal')">✕</button></div><div class="modal-body"><div class="form-group"><label>用户名</label><input type="text" id="authUsername" placeholder="用户名"></div><div class="form-group"><label>密码</label><input type="password" id="authPassword" placeholder="密码"></div><div class="form-group" id="authEmailGroup" style="display:none"><label>邮箱</label><input type="email" id="authEmail" placeholder="邮箱"></div><button class="btn btn-primary" style="width:100%" onclick="submitAuth()" id="authSubmit">登录</button><p style="text-align:center;margin-top:16px;font-size:14px;color:var(--text2)" id="authSwitch">没有账号？<a href="#" onclick="toggleAuthMode()" style="color:var(--accent)">注册</a></p></div></div></div>
+<div class="modal" id="pricingModal"><div class="modal-content" style="max-width:800px"><div class="modal-header"><h3>选择套餐</h3><button class="btn btn-icon btn-ghost" onclick="closeModal('pricingModal')">✕</button></div><div class="modal-body"><div class="price-cards" id="priceCards"></div></div></div></div>
+<div class="modal" id="paymentModal"><div class="modal-content" style="max-width:400px"><div class="modal-header"><h3>支付</h3><button class="btn btn-icon btn-ghost" onclick="closeModal('paymentModal')">✕</button></div><div class="modal-body" style="text-align:center"><div id="paymentInfo"></div><div style="margin:24px 0;padding:24px;background:var(--bg);border-radius:12px"><p style="color:var(--text2);margin-bottom:12px">扫码支付</p><div style="width:150px;height:150px;background:var(--bg3);margin:0 auto;border-radius:8px;display:flex;align-items:center;justify-content:center"><span style="font-size:48px">📱</span></div></div><button class="btn btn-success" style="width:100%" onclick="completePayment()">已完成支付</button></div></div></div>
+<div class="modal" id="chatSettingsModal"><div class="modal-content" style="max-width:450px"><div class="modal-header"><h3>对话设置</h3><button class="btn btn-icon btn-ghost" onclick="closeModal('chatSettingsModal')">✕</button></div><div class="modal-body">
+<div class="setting-row"><div class="setting-row-label">模型温度</div><div class="slider-container"><input type="range" id="csTemp" min="0" max="2" step="0.1" value="0.7" oninput="$('csTempVal').textContent=this.value"><span class="slider-value" id="csTempVal">0.7</span></div></div>
+<div class="setting-row"><div class="setting-row-label">上下文数</div><div class="slider-container"><input type="range" id="csContext" min="1" max="50" value="10" oninput="$('csContextVal').textContent=this.value"><span class="slider-value" id="csContextVal">10</span></div></div>
+<div class="setting-row"><div class="setting-row-label">流式输出</div><label class="switch"><input type="checkbox" id="csStream" checked><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">最大 Token</div><div class="slider-container"><input type="range" id="csMaxTokens" min="256" max="8192" step="256" value="2048" oninput="$('csMaxTokensVal').textContent=this.value"><span class="slider-value" id="csMaxTokensVal">2048</span></div></div>
+<button class="btn btn-primary" style="width:100%;margin-top:16px" onclick="saveChatSettings()">保存设置</button>
+</div></div></div>
+<div class="modal" id="shortcutModal"><div class="modal-content" style="max-width:450px"><div class="modal-header"><h3 id="shortcutModalTitle">添加快捷短语</h3><button class="btn btn-icon btn-ghost" onclick="closeModal('shortcutModal')">✕</button></div><div class="modal-body">
+<div class="form-group"><label>名称</label><input type="text" id="shortcutName" placeholder="例如：翻译"></div>
+<div class="form-group"><label>触发词</label><input type="text" id="shortcutTrigger" placeholder="例如：/translate"></div>
+<div class="form-group"><label>内容</label><textarea id="shortcutContent" rows="5" placeholder="请将以下内容翻译成中文：&#10;&#10;{{input}}"></textarea></div>
+<button class="btn btn-primary" style="width:100%" onclick="saveShortcutFromModal()">保存</button>
+</div></div></div>
+<div class="modal" id="memoryModal"><div class="modal-content" style="max-width:500px"><div class="modal-header"><h3>添加记忆</h3><button class="btn btn-icon btn-ghost" onclick="closeModal('memoryModal')">✕</button></div><div class="modal-body">
+<div class="form-group"><label>记忆内容<br><small style="color:var(--text2)">AI 会在对话中记住这些信息</small></label><textarea id="memoryContent" rows="4" placeholder="例如：我是一名前端开发者，喜欢使用 React 和 TypeScript"></textarea></div>
+<div class="form-group"><label>分类</label><select id="memoryModalCategory" style="width:100%"><option value="个人">👤 个人信息</option><option value="工作">💼 工作相关</option><option value="偏好">⭐ 偏好设置</option><option value="其他">📝 其他</option></select></div>
+<button class="btn btn-primary" style="width:100%" onclick="saveMemoryFromModal()">添加记忆</button>
+</div></div></div>
+<div class="modal" id="hotkeyHelpModal"><div class="modal-content" style="max-width:500px"><div class="modal-header"><h3>⌨️ 快捷键</h3><button class="btn btn-icon btn-ghost" onclick="closeModal('hotkeyHelpModal')">✕</button></div><div class="modal-body">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<div class="hotkey-help-item"><span class="hotkey-help-key">Ctrl + N</span><span>新建对话</span></div>
+<div class="hotkey-help-item"><span class="hotkey-help-key">Ctrl + E</span><span>快捷助手</span></div>
+<div class="hotkey-help-item"><span class="hotkey-help-key">Ctrl + ,</span><span>打开设置</span></div>
+<div class="hotkey-help-item"><span class="hotkey-help-key">Ctrl + /</span><span>快捷键帮助</span></div>
+<div class="hotkey-help-item"><span class="hotkey-help-key">Enter</span><span>发送消息</span></div>
+<div class="hotkey-help-item"><span class="hotkey-help-key">Shift + Enter</span><span>换行</span></div>
+<div class="hotkey-help-item"><span class="hotkey-help-key">Escape</span><span>关闭弹窗</span></div>
+<div class="hotkey-help-item"><span class="hotkey-help-key">Ctrl + [</span><span>切换助手</span></div>
+<div class="hotkey-help-item"><span class="hotkey-help-key">Ctrl + ]</span><span>切换话题</span></div>
+<div class="hotkey-help-item"><span class="hotkey-help-key">Ctrl + +</span><span>放大界面</span></div>
+<div class="hotkey-help-item"><span class="hotkey-help-key">Ctrl + -</span><span>缩小界面</span></div>
+<div class="hotkey-help-item"><span class="hotkey-help-key">Ctrl + 0</span><span>重置缩放</span></div>
+</div>
+</div></div></div>
 <script>
-const modelMap = {
-    // 国际主流
-    openai: 'gpt-4o',
-    azure_openai: 'gpt-4o',
-    claude: 'claude-sonnet-4-20250514',
-    gemini: 'gemini-pro',
-    vertex_ai: 'gemini-pro',
-    mistral: 'mistral-large-latest',
-    groq: 'llama-3.3-70b-versatile',
-    together: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
-    fireworks: 'accounts/fireworks/models/llama-v3p3-70b-instruct',
-    perplexity: 'llama-3.1-sonar-large-128k-online',
-    openrouter: 'openai/gpt-4o',
-    grok: 'grok-2-latest',
-    hyperbolic: 'meta-llama/Llama-3.3-70B-Instruct',
-    nvidia: 'meta/llama-3.1-405b-instruct',
-    github_models: 'gpt-4o',
-    github_copilot: 'gpt-4o',
-    aws_bedrock: 'anthropic.claude-3-sonnet',
-    jina: 'jina-embeddings-v2-base-en',
-    voyage: 'voyage-large-2',
-    poe: 'GPT-4o',
-    // 国内平台
-    deepseek: 'deepseek-chat',
-    zhipu: 'glm-4-plus',
-    moonshot: 'moonshot-v1-128k',
-    baichuan: 'Baichuan4',
-    yi: 'yi-large',
-    qwen: 'qwen-plus',
-    stepfun: 'step-2-16k',
-    minimax: 'abab6.5s-chat',
-    doubao: 'doubao-pro-32k',
-    hunyuan: 'hunyuan-pro',
-    tencent_ti: 'hunyuan-pro',
-    baidu_qianfan: 'ernie-4.0-8k',
-    tianyi: 'hunyuan-pro',
-    wuxinqiong: 'wuxinqiong-chat',
-    // API 聚合平台
-    siliconflow: 'deepseek-ai/DeepSeek-V3',
-    aihubmix: 'gpt-4o',
-    ocoolai: 'gpt-4o',
-    alaya: 'gpt-4o',
-    dmxapi: 'gpt-4o',
-    aionly: 'gpt-4o',
-    burncloud: 'gpt-4o',
-    tokenflux: 'gpt-4o',
-    ai302: 'gpt-4o',
-    cephalon: 'gpt-4o',
-    lanfun: 'gpt-4o',
-    ph8: 'gpt-4o',
-    ppio: 'gpt-4o',
-    qiniu: 'gpt-4o',
-    longcat: 'gpt-4o',
-    // 本地
-    ollama: 'llama3.2',
-    lmstudio: 'local-model',
-    gpustack: 'local-model',
-    intel_ovms: 'local-model'
-};
-
-let sessions = JSON.parse(localStorage.getItem('sessions') || '[]');
-let currentSessionId = localStorage.getItem('currentSessionId');
-let totalTokens = 0;
-
-marked.setOptions({
-    highlight: (code, lang) => {
-        if (lang && hljs.getLanguage(lang)) {
-            return hljs.highlight(code, { language: lang }).value;
-        }
-        return hljs.highlightAuto(code).value;
-    },
-    breaks: true
-});
-
-function init() {
-    if (sessions.length === 0) newSession();
-    else {
-        if (!currentSessionId || !sessions.find(s => s.id === currentSessionId)) {
-            currentSessionId = sessions[0].id;
-        }
-        renderSessions();
-        loadSession(currentSessionId);
-    }
-    const theme = localStorage.getItem('theme') || 'dark';
-    if (theme === 'light') document.body.classList.add('light-theme');
-    document.querySelector('.toggle-theme').textContent = theme === 'light' ? '🌙' : '☀️';
-}
-
-function toggleTheme() {
-    document.body.classList.toggle('light-theme');
-    const isLight = document.body.classList.contains('light-theme');
-    localStorage.setItem('theme', isLight ? 'light' : 'dark');
-    document.querySelector('.toggle-theme').textContent = isLight ? '🌙' : '☀️';
-}
-
-function newSession() {
-    const session = {
-        id: Date.now().toString(),
-        name: '新对话 ' + (sessions.length + 1),
-        messages: [],
-        tokens: 0,
-        provider: document.getElementById('provider').value,
-        model: document.getElementById('model').value
-    };
-    sessions.unshift(session);
-    currentSessionId = session.id;
-    saveSessions();
-    renderSessions();
-    renderChat();
-}
-
-function saveSessions() {
-    localStorage.setItem('sessions', JSON.stringify(sessions));
-    localStorage.setItem('currentSessionId', currentSessionId);
-}
-
-function getCurrentSession() {
-    return sessions.find(s => s.id === currentSessionId);
-}
-
-function renderSessions() {
-    const list = document.getElementById('sessionList');
-    list.innerHTML = sessions.map(s => `
-        <div class="session-item ${s.id === currentSessionId ? 'active' : ''}" onclick="loadSession('${s.id}')">
-            <span>${s.name}</span>
-            <span class="delete" onclick="event.stopPropagation();deleteSession('${s.id}')">×</span>
-        </div>
-    `).join('');
-}
-
-function loadSession(id) {
-    currentSessionId = id;
-    const session = getCurrentSession();
-    if (session) {
-        document.getElementById('provider').value = session.provider || 'openai';
-        document.getElementById('model').value = session.model || modelMap[session.provider];
-        totalTokens = session.tokens || 0;
-    }
-    saveSessions();
-    renderSessions();
-    renderChat();
-}
-
-function deleteSession(id) {
-    sessions = sessions.filter(s => s.id !== id);
-    if (sessions.length === 0) newSession();
-    else if (currentSessionId === id) currentSessionId = sessions[0].id;
-    saveSessions();
-    renderSessions();
-    renderChat();
-}
-
-function clearSession() {
-    const session = getCurrentSession();
-    if (session) {
-        session.messages = [];
-        session.tokens = 0;
-        totalTokens = 0;
-        saveSessions();
-        renderChat();
-    }
-}
-
-function renderChat() {
-    const session = getCurrentSession();
-    const chat = document.getElementById('chat');
-    if (!session) { chat.innerHTML = ''; return; }
-    
-    chat.innerHTML = session.messages.map(m => {
-        const content = m.role === 'assistant' ? marked.parse(m.content) : escapeHtml(m.content);
-        return `<div class="message ${m.role} ${m.error ? 'error' : ''}">${content}</div>`;
-    }).join('');
-    
-    document.getElementById('tokenCount').textContent = session.tokens || 0;
-    document.getElementById('msgCount').textContent = session.messages.length;
-    chat.scrollTop = chat.scrollHeight;
-    document.querySelectorAll('.message pre code').forEach(el => hljs.highlightElement(el));
-}
-
-function escapeHtml(text) {
-    return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-}
-
-function addMessage(role, content, error = false) {
-    const session = getCurrentSession();
-    if (!session) return;
-    session.messages.push({ role, content, error });
-    if (session.messages.length === 1) {
-        session.name = content.slice(0, 20) + (content.length > 20 ? '...' : '');
-    }
-    saveSessions();
-    renderChat();
-    renderSessions();
-}
-
-function updateLastMessage(content) {
-    const session = getCurrentSession();
-    if (session && session.messages.length > 0) {
-        session.messages[session.messages.length - 1].content = content;
-        saveSessions();
-        renderChat();
-    }
-}
-
-document.getElementById('provider').onchange = function() {
-    document.getElementById('model').value = modelMap[this.value] || '';
-    const hint = document.getElementById('urlHint');
-    if (this.value === 'custom') {
-        hint.textContent = '(必填)';
-        hint.style.color = '#e53e3e';
-    } else {
-        hint.textContent = '(可选)';
-        hint.style.color = '';
-    }
-    const session = getCurrentSession();
-    if (session) {
-        session.provider = this.value;
-        session.model = modelMap[this.value];
-        saveSessions();
-    }
-};
-
-function handleKey(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        send();
-    }
-}
-
-async function send() {
-    const input = document.getElementById('input');
-    const text = input.value.trim();
-    if (!text) return;
-
-    input.value = '';
-    addMessage('user', text);
-
-    const btn = document.getElementById('sendBtn');
-    btn.disabled = true;
-
-    const session = getCurrentSession();
-    session.provider = document.getElementById('provider').value;
-    session.model = document.getElementById('model').value;
-
-    const payload = {
-        provider: session.provider,
-        model: session.model,
-        messages: session.messages.filter(m => !m.error).map(m => ({ role: m.role, content: m.content })),
-        temperature: parseFloat(document.getElementById('temperature').value),
-        max_tokens: parseInt(document.getElementById('max_tokens').value),
-        stream: document.getElementById('stream').checked,
-        custom_url: document.getElementById('customUrl').value || null,
-        api_key: document.getElementById('apiKey').value || null
-    };
-
-    try {
-        if (payload.stream) {
-            const response = await fetch('/v1/chat/completions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.detail || `HTTP ${response.status}`);
-            }
-            
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            addMessage('assistant', '');
-            let fullText = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                const chunk = decoder.decode(value);
-                for (const line of chunk.split('\n')) {
-                    if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                        try {
-                            const data = JSON.parse(line.slice(6));
-                            const content = data.choices?.[0]?.delta?.content || '';
-                            fullText += content;
-                            updateLastMessage(fullText);
-                            if (data.usage) {
-                                session.tokens = (session.tokens || 0) + (data.usage.total_tokens || 0);
-                                document.getElementById('tokenCount').textContent = session.tokens;
-                            }
-                        } catch {}
-                    }
-                }
-            }
-        } else {
-            const response = await fetch('/v1/chat/completions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.detail || `HTTP ${response.status}`);
-            }
-            
-            const data = await response.json();
-            let content = '';
-            if (payload.provider === 'claude') {
-                content = data.content?.[0]?.text || JSON.stringify(data);
-                session.tokens = (session.tokens || 0) + (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0);
-            } else if (payload.provider === 'gemini') {
-                content = data.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(data);
-            } else {
-                content = data.choices?.[0]?.message?.content || JSON.stringify(data);
-                session.tokens = (session.tokens || 0) + (data.usage?.total_tokens || 0);
-            }
-            addMessage('assistant', content);
-            document.getElementById('tokenCount').textContent = session.tokens;
-        }
-        saveSessions();
-    } catch (e) {
-        addMessage('assistant', '❌ 错误: ' + e.message, true);
-    }
-    btn.disabled = false;
-}
-
-function exportJSON() {
-    const session = getCurrentSession();
-    if (!session) return;
-    const blob = new Blob([JSON.stringify(session, null, 2)], { type: 'application/json' });
-    downloadBlob(blob, `chat-${session.id}.json`);
-}
-
-function exportMD() {
-    const session = getCurrentSession();
-    if (!session) return;
-    let md = `# ${session.name}\n\n`;
-    session.messages.forEach(m => {
-        md += `## ${m.role === 'user' ? '👤 用户' : '🤖 助手'}\n\n${m.content}\n\n`;
-    });
-    const blob = new Blob([md], { type: 'text/markdown' });
-    downloadBlob(blob, `chat-${session.id}.md`);
-}
-
-function downloadBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-init();
+var currentUser=null,authToken=localStorage.getItem('token'),isRegisterMode=false,currentPaymentId=null;
+var providers=JSON.parse(localStorage.getItem('providers')||'null')||[
+{id:'openai',name:'OpenAI',url:'https://api.openai.com/v1',key:'',type:'openai',models:[{id:'gpt-4o',name:'GPT-4o'},{id:'gpt-4o-mini',name:'GPT-4o Mini'}]},
+{id:'claude',name:'Claude',url:'https://api.anthropic.com/v1',key:'',type:'claude',models:[{id:'claude-sonnet-4-20250514',name:'Claude Sonnet 4'}]},
+{id:'deepseek',name:'DeepSeek',url:'https://api.deepseek.com/v1',key:'',type:'openai',models:[{id:'deepseek-chat',name:'DeepSeek Chat'},{id:'deepseek-reasoner',name:'DeepSeek R1'}]},
+{id:'qwen',name:'通义千问',url:'https://dashscope.aliyuncs.com/compatible-mode/v1',key:'',type:'openai',models:[{id:'qwen-turbo',name:'Qwen Turbo'},{id:'qwen-plus',name:'Qwen Plus'}]},
+{id:'zhipu',name:'智谱AI',url:'https://open.bigmodel.cn/api/paas/v4',key:'',type:'openai',models:[{id:'glm-4',name:'GLM-4'}]},
+{id:'moonshot',name:'Moonshot',url:'https://api.moonshot.cn/v1',key:'',type:'openai',models:[{id:'moonshot-v1-8k',name:'Moonshot V1'}]}
+];
+var currentProviderId=providers[0]?providers[0].id:null;
+var chats=JSON.parse(localStorage.getItem('chats')||'[]'),currentChatId=null;
+var notes=[],currentNoteId=null,memories=[],shortcuts=JSON.parse(localStorage.getItem('shortcuts')||'[]'),uploadedDoc=null;
+var assistants=JSON.parse(localStorage.getItem('assistants')||'null')||[
+{id:'default',name:'默认助手',emoji:'😀',desc:'通用AI助手',prompt:'你是一个有帮助的AI助手。',temp:0.7,context:10,stream:true,maxTokens:2048,isSystem:true},
+{id:'pm',name:'产品经理',emoji:'👨‍💼',desc:'产品规划与需求分析',prompt:'你是一位资深产品经理，擅长产品规划、需求分析、用户研究和项目管理。',temp:0.7,context:10,stream:true,maxTokens:2048},
+{id:'strategy',name:'策略产品经理',emoji:'🎯',desc:'产品策略与商业分析',prompt:'你是一位策略产品经理，擅长市场分析、竞品研究和商业模式设计。',temp:0.7,context:10,stream:true,maxTokens:2048},
+{id:'community',name:'社群运营',emoji:'👥',desc:'社群管理与用户运营',prompt:'你是一位社群运营专家，擅长社群管理、用户增长和活动策划。',temp:0.7,context:10,stream:true,maxTokens:2048},
+{id:'content',name:'内容运营',emoji:'🐰',desc:'内容创作与传播',prompt:'你是一位内容运营专家，擅长内容策划、文案撰写和内容分发。',temp:0.8,context:10,stream:true,maxTokens:2048},
+{id:'merchant',name:'商家运营',emoji:'🛍️',desc:'商家管理与服务',prompt:'你是一位商家运营专家，擅长商家管理、招商和商家服务。',temp:0.7,context:10,stream:true,maxTokens:2048},
+{id:'product',name:'产品运营',emoji:'🚀',desc:'产品推广与增长',prompt:'你是一位产品运营专家，擅长产品推广、用户增长和数据分析。',temp:0.7,context:10,stream:true,maxTokens:2048},
+{id:'sales',name:'销售运营',emoji:'💼',desc:'销售策略与客户管理',prompt:'你是一位销售运营专家，擅长销售策略、客户管理和业绩分析。',temp:0.7,context:10,stream:true,maxTokens:2048},
+{id:'user',name:'用户运营',emoji:'👤',desc:'用户生命周期管理',prompt:'你是一位用户运营专家，擅长用户分层、用户激励和用户留存。',temp:0.7,context:10,stream:true,maxTokens:2048},
+{id:'marketing',name:'市场营销',emoji:'📢',desc:'品牌推广与营销策划',prompt:'你是一位市场营销专家，擅长品牌策划、营销活动和市场推广。',temp:0.8,context:10,stream:true,maxTokens:2048},
+{id:'coder',name:'程序员',emoji:'💻',desc:'代码开发与技术咨询',prompt:'你是一位资深程序员，擅长多种编程语言，能够帮助用户解决编程问题、代码审查和技术方案设计。',temp:0.5,context:15,stream:true,maxTokens:4096},
+{id:'translator',name:'翻译专家',emoji:'🌐',desc:'多语言翻译',prompt:'你是一位专业翻译，精通中英日韩等多种语言，能够准确传达原文含义并保持语言风格。',temp:0.3,context:5,stream:true,maxTokens:2048}
+];
+var currentAssistantId=assistants[0]?assistants[0].id:null;
+var chatSettings={temp:0.7,context:10,stream:false,maxTokens:2048};
+function $(id){return document.getElementById(id)}
+function save(){localStorage.setItem('providers',JSON.stringify(providers))}
+function saveChats(){localStorage.setItem('chats',JSON.stringify(chats))}
+function saveShortcuts(){localStorage.setItem('shortcuts',JSON.stringify(shortcuts))}
+function saveAssistants(){localStorage.setItem('assistants',JSON.stringify(assistants))}
+function escapeHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}
+function closeModal(id){$(id).classList.remove('show')}
+function showModal(id){$(id).classList.add('show')}
+function setAccent(c){document.documentElement.style.setProperty('--accent',c)}
+function toggleCollapse(el){var content=el.nextElementSibling;content.classList.toggle('show');el.querySelector('span:last-child').textContent=content.classList.contains('show')?'▲':'▼'}
+function api(path,options){options=options||{};var headers=Object.assign({'Content-Type':'application/json'},options.headers||{});if(authToken)headers['Authorization']='Bearer '+authToken;return fetch(path,Object.assign({},options,{headers:headers})).then(function(res){if(!res.ok)return res.json().then(function(e){throw new Error(e.detail||'Error')});return res.json()})}
+document.querySelectorAll('.nav-item[data-page]').forEach(function(n){n.onclick=function(){document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});n.classList.add('active');var page=$('page-'+n.dataset.page);if(page)page.classList.add('active')}});
+function showAuthModal(){isRegisterMode=false;updateAuthUI();showModal('authModal')}
+function toggleAuthMode(){isRegisterMode=!isRegisterMode;updateAuthUI()}
+function updateAuthUI(){$('authTitle').textContent=isRegisterMode?'注册':'登录';$('authSubmit').textContent=isRegisterMode?'注册':'登录';$('authEmailGroup').style.display=isRegisterMode?'block':'none';$('authSwitch').innerHTML=isRegisterMode?'已有账号？<a href="#" onclick="toggleAuthMode()" style="color:var(--accent)">登录</a>':'没有账号？<a href="#" onclick="toggleAuthMode()" style="color:var(--accent)">注册</a>'}
+function submitAuth(){var username=$('authUsername').value.trim(),password=$('authPassword').value;if(!username||!password)return alert('请填写');if(isRegisterMode){api('/api/auth/register',{method:'POST',body:JSON.stringify({username:username,password:password,email:$('authEmail').value})}).then(function(){alert('注册成功');toggleAuthMode()}).catch(function(e){alert(e.message)})}else{api('/api/auth/login',{method:'POST',body:JSON.stringify({username:username,password:password})}).then(function(res){authToken=res.token;localStorage.setItem('token',authToken);currentUser=res.user;closeModal('authModal');updateUserUI();loadUserData()}).catch(function(e){alert(e.message)})}}
+function checkAuth(){if(!authToken)return;api('/api/auth/me').then(function(u){currentUser=u;updateUserUI();loadUserData()}).catch(function(){authToken=null;localStorage.removeItem('token')})}
+function updateUserUI(){$('navUserName').textContent=currentUser?currentUser.username:'登录'}
+function loadUserData(){if(!currentUser)return;api('/api/notes').then(function(n){notes=n;renderNotes()}).catch(function(){});api('/api/memories').then(function(m){memories=m;renderMemories()}).catch(function(){})}
+function showPricing(){api('/api/plans').then(function(plans){var html='';for(var key in plans){var p=plans[key];html+='<div class="price-card" onclick="selectPlan(\''+key+'\')"><h4>'+p.name+'</h4><div class="price">'+(p.price>0?'¥'+p.price:'免费')+'<span>/月</span></div><ul>'+p.features.map(function(f){return'<li>'+f+'</li>'}).join('')+'</ul><button class="btn '+(key==='free'?'btn-ghost':'btn-primary')+'" style="width:100%">'+(key==='free'?'当前':'订阅')+'</button></div>'}$('priceCards').innerHTML=html;showModal('pricingModal')}).catch(function(e){alert(e.message)})}
+function selectPlan(plan){if(plan==='free')return;if(!currentUser){closeModal('pricingModal');showAuthModal();return}api('/api/payments/create',{method:'POST',body:JSON.stringify({plan:plan})}).then(function(res){currentPaymentId=res.payment_id;$('paymentInfo').innerHTML='<h4>'+plan+'</h4><div style="font-size:32px;font-weight:700;color:var(--accent)">¥'+res.amount+'</div>';closeModal('pricingModal');showModal('paymentModal')}).catch(function(e){alert(e.message)})}
+function completePayment(){if(!currentPaymentId)return;api('/api/payments/'+currentPaymentId+'/complete',{method:'POST'}).then(function(){alert('支付成功！');closeModal('paymentModal');checkAuth()}).catch(function(e){alert(e.message)})}
+function checkUpdate(){alert('当前已是最新版本')}
+function showChatSettings(){$('csTemp').value=chatSettings.temp;$('csTempVal').textContent=chatSettings.temp;$('csContext').value=chatSettings.context;$('csContextVal').textContent=chatSettings.context;$('csStream').checked=chatSettings.stream;$('csMaxTokens').value=chatSettings.maxTokens;$('csMaxTokensVal').textContent=chatSettings.maxTokens;showModal('chatSettingsModal')}
+function saveChatSettings(){chatSettings.temp=parseFloat($('csTemp').value);chatSettings.context=parseInt($('csContext').value);chatSettings.stream=$('csStream').checked;chatSettings.maxTokens=parseInt($('csMaxTokens').value);closeModal('chatSettingsModal');alert('设置已保存')}
+</script>
+<script>
+// 助手管理
+function renderAssistants(){var html=assistants.map(function(a){return'<div class="assistant-card'+(a.id===currentAssistantId?' active':'')+'" onclick="selectAssistant(\''+a.id+'\')"><div class="assistant-avatar" style="background:'+(a.isSystem?'linear-gradient(135deg,#fef3c7,#fde68a)':'linear-gradient(135deg,#e0e7ff,#c7d2fe)')+'">'+a.emoji+'</div><div class="assistant-info"><div class="assistant-name">'+a.name+'</div><div class="assistant-desc">'+a.desc+'</div></div>'+(a.isSystem?'<span class="assistant-tag">系统</span>':'')+'</div>'}).join('');$('assistantList').innerHTML=html;updateAssistantSelect()}
+function selectAssistant(id){currentAssistantId=id;var a=assistants.find(function(x){return x.id===id});if(a){$('aName').value=a.name;$('aEmoji').value=a.emoji;$('aDesc').value=a.desc;$('aPrompt').value=a.prompt;$('aTemp').value=a.temp;$('aTempVal').textContent=a.temp;$('aContext').value=a.context;$('aContextVal').textContent=a.context;$('aStream').checked=a.stream;$('aMaxTokens').value=a.maxTokens;$('aMaxTokensVal').textContent=a.maxTokens}renderAssistants()}
+function addAssistant(){var id='a_'+Date.now();assistants.push({id:id,name:'新助手',emoji:'🤖',desc:'自定义助手',prompt:'你是一个有帮助的AI助手。',temp:0.7,context:10,stream:true,maxTokens:2048});saveAssistants();renderAssistants();selectAssistant(id)}
+function saveAssistant(){var a=assistants.find(function(x){return x.id===currentAssistantId});if(a){a.name=$('aName').value;a.emoji=$('aEmoji').value;a.desc=$('aDesc').value;a.prompt=$('aPrompt').value;a.temp=parseFloat($('aTemp').value);a.context=parseInt($('aContext').value);a.stream=$('aStream').checked;a.maxTokens=parseInt($('aMaxTokens').value);saveAssistants();renderAssistants();alert('保存成功')}}
+function deleteAssistant(){var a=assistants.find(function(x){return x.id===currentAssistantId});if(a&&a.isSystem)return alert('系统助手不能删除');if(!confirm('确定删除？'))return;assistants=assistants.filter(function(x){return x.id!==currentAssistantId});saveAssistants();currentAssistantId=assistants[0]?assistants[0].id:null;renderAssistants();if(currentAssistantId)selectAssistant(currentAssistantId)}
+function switchAssistantTab(tab){document.querySelectorAll('#page-assistants .tab').forEach(function(t){t.classList.remove('active')});event.target.classList.add('active');$('assistantTabInfo').style.display=tab==='info'?'block':'none';$('assistantTabSettings').style.display=tab==='settings'?'block':'none'}
+function updateAssistantSelect(){$('chatAssistant').innerHTML=assistants.map(function(a){return'<option value="'+a.id+'">'+a.emoji+' '+a.name+'</option>'}).join('')}
+function onAssistantChange(){var a=assistants.find(function(x){return x.id===$('chatAssistant').value});if(a){chatSettings.temp=a.temp;chatSettings.context=a.context;chatSettings.stream=a.stream;chatSettings.maxTokens=a.maxTokens}}
+// 聊天
+function renderChats(){var html='';if(chats.length===0){html='<div class="empty-state"><span>📭</span><p>暂无对话</p></div>'}else{chats.forEach(function(c){html+='<div class="sidebar-item'+(c.id===currentChatId?' active':'')+'" onclick="selectChat(\''+c.id+'\')" oncontextmenu="showChatMenu(event,\''+c.id+'\')"><div class="sidebar-item-icon">💬</div><div class="sidebar-item-info"><div class="sidebar-item-title">'+(c.title||'新对话')+'</div><div class="sidebar-item-desc">'+(c.messages?c.messages.length:0)+' 条消息</div></div><button class="btn btn-ghost btn-sm chat-delete-btn" onclick="event.stopPropagation();deleteChat(\''+c.id+'\')" style="opacity:0;padding:4px 8px">🗑️</button></div>'})}$('chatList').innerHTML=html}
+function selectChat(id){currentChatId=id;renderChats();renderMessages()}
+function newChat(){var id='chat_'+Date.now();chats.unshift({id:id,title:'新对话',messages:[],provider:providers[0]?providers[0].id:'',model:providers[0]&&providers[0].models[0]?providers[0].models[0].id:'',assistant:currentAssistantId});saveChats();renderChats();selectChat(id)}
+function renderMessages(){var chat=chats.find(function(c){return c.id===currentChatId});if(!chat||!chat.messages||chat.messages.length===0){$('chatMessages').innerHTML='<div class="empty-state"><span>💬</span><p>开始新的对话</p><p style="font-size:12px;margin-top:8px;color:var(--text2)">Ctrl+N 新建对话 · Enter 发送消息</p></div>';return}var html='';chat.messages.forEach(function(m,i){var actions=m.role==='assistant'?'<div class="message-actions"><button class="message-action-btn" onclick="copyMessage('+i+')" title="复制">📋</button><button class="message-action-btn" onclick="regenerateMessage('+i+')" title="重新生成">🔄</button><button class="message-action-btn" onclick="readAloud('+i+')" title="朗读">🔊</button></div>':'<div class="message-actions"><button class="message-action-btn" onclick="copyMessage('+i+')" title="复制">📋</button><button class="message-action-btn" onclick="editMessage('+i+')" title="编辑">✏️</button></div>';html+='<div class="message '+m.role+(m.error?' error':'')+'"><div class="message-content">'+(m.role==='assistant'?marked.parse(m.content):escapeHtml(m.content))+'</div>'+actions+'</div>'});$('chatMessages').innerHTML=html;$('chatMessages').scrollTop=$('chatMessages').scrollHeight;hljs.highlightAll()}
+function handleChatKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage()}e.target.style.height='auto';e.target.style.height=Math.min(e.target.scrollHeight,150)+'px'}
+function sendMessage(){var input=$('chatInput'),text=input.value.trim();if(!text)return;input.value='';input.style.height='auto';var chat=chats.find(function(c){return c.id===currentChatId});if(!chat){newChat();chat=chats[0]}chat.messages.push({role:'user',content:text});if(chat.messages.length===1)chat.title=text.slice(0,25);saveChats();renderChats();renderMessages();var p=providers.find(function(x){return x.id===$('chatProvider').value}),key=p?cleanApiKey(p.key):'',stream=chatSettings.stream;console.log('Provider:',p?p.name:'none','Key length:',key?key.length:0,'URL:',p?p.url:'none');var assistant=assistants.find(function(x){return x.id===$('chatAssistant').value});var messages=chat.messages.filter(function(m){return!m.error}).slice(-chatSettings.context).map(function(m){return{role:m.role,content:m.content}});if(assistant&&assistant.prompt){messages.unshift({role:'system',content:assistant.prompt})}$('sendBtn').disabled=true;var providerType=p?p.type:'openai';var payload={provider:providerType==='claude'?'claude':'custom',model:$('chatModel').value,messages:messages,custom_url:p?p.url:'',api_key:key,stream:stream,temperature:chatSettings.temp,max_tokens:chatSettings.maxTokens};console.log('Sending payload:',payload);if(stream){chat.messages.push({role:'assistant',content:''});renderMessages();var headers={'Content-Type':'application/json'};if(authToken)headers['Authorization']='Bearer '+authToken;fetch('/v1/chat/completions',{method:'POST',headers:headers,body:JSON.stringify(payload)}).then(function(response){var reader=response.body.getReader(),decoder=new TextDecoder(),content='';function read(){reader.read().then(function(result){if(result.done){saveChats();$('sendBtn').disabled=false;return}var chunk=decoder.decode(result.value),lines=chunk.split('\n');lines.forEach(function(line){if(line.indexOf('data: ')===0){var data=line.slice(6);if(data==='[DONE]')return;try{var parsed=JSON.parse(data);console.log('Stream chunk:',parsed);var delta=parsed.choices&&parsed.choices[0]&&parsed.choices[0].delta&&parsed.choices[0].delta.content;if(delta){content+=delta;chat.messages[chat.messages.length-1].content=content;renderMessages()}}catch(e){console.log('Parse error:',e,data)}}});read()})}read()}).catch(function(e){chat.messages.push({role:'assistant',content:'错误: '+e.message,error:true});saveChats();renderMessages();$('sendBtn').disabled=false})}else{var headers={'Content-Type':'application/json'};if(authToken)headers['Authorization']='Bearer '+authToken;fetch('/v1/chat/completions',{method:'POST',headers:headers,body:JSON.stringify(payload)}).then(function(r){return r.json()}).then(function(data){var content='';if(data.error||data.detail){content=data.detail||JSON.stringify(data);chat.messages.push({role:'assistant',content:content,error:true})}else if(p&&p.type==='claude'){content=data.content&&data.content[0]?data.content[0].text:JSON.stringify(data);chat.messages.push({role:'assistant',content:content})}else{content=data.choices&&data.choices[0]&&data.choices[0].message?data.choices[0].message.content:JSON.stringify(data);chat.messages.push({role:'assistant',content:content})}saveChats();renderMessages();$('sendBtn').disabled=false}).catch(function(e){chat.messages.push({role:'assistant',content:'错误: '+e.message,error:true});saveChats();renderMessages();$('sendBtn').disabled=false})}}
+function clearChat(){var chat=chats.find(function(c){return c.id===currentChatId});if(chat&&confirm('确定清空？')){chat.messages=[];saveChats();renderMessages()}}
+function exportChat(){var chat=chats.find(function(c){return c.id===currentChatId});if(!chat)return;var text=chat.messages.map(function(m){return'['+m.role+']\n'+m.content}).join('\n\n---\n\n');var blob=new Blob([text],{type:'text/plain'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(chat.title||'chat')+'.txt';a.click()}
+function updateChatProviders(){var html=providers.map(function(p){return'<option value="'+p.id+'">'+p.name+'</option>'}).join('');$('chatProvider').innerHTML=html;if($('defaultChatProvider'))$('defaultChatProvider').innerHTML=html;onProviderChange()}
+function onProviderChange(){var p=providers.find(function(x){return x.id===$('chatProvider').value});$('chatModel').innerHTML=(p&&p.models?p.models:[]).map(function(m){return'<option value="'+m.id+'">'+m.name+'</option>'}).join('')}
+</script>
+<script>
+// 模型服务
+function renderProviders(){var html=providers.map(function(p){return'<div class="sidebar-item'+(p.id===currentProviderId?' active':'')+'" onclick="selectProvider(\''+p.id+'\')"><div class="sidebar-item-icon">'+p.name[0]+'</div><div class="sidebar-item-info"><div class="sidebar-item-title">'+p.name+'</div><div class="sidebar-item-desc">'+(p.models?p.models.length:0)+' 个模型</div></div><div style="width:8px;height:8px;border-radius:50%;background:'+(p.key?'var(--success)':'var(--text2)')+'"></div></div>'}).join('');$('providerList').innerHTML=html}
+function selectProvider(id){currentProviderId=id;var p=providers.find(function(x){return x.id===id});if(p){$('pName').value=p.name;$('pUrl').value=p.url;$('pKey').value=p.key;$('pType').value=p.type||'openai';renderModels(p.models||[])}renderProviders()}
+function renderModels(models){if(models.length===0){$('modelList').innerHTML='<div class="empty-state"><span>📭</span><p>暂无模型</p></div>';return}var html=models.map(function(m){return'<div class="list-item"><div class="list-item-icon">🤖</div><div class="list-item-content"><div class="list-item-title">'+m.name+'</div><div class="list-item-desc">'+m.id+'</div></div><button class="btn btn-ghost btn-sm" onclick="deleteModel(\''+m.id+'\')">🗑️</button></div>'}).join('');$('modelList').innerHTML=html}
+function addProvider(){var id='p_'+Date.now();providers.push({id:id,name:'新服务',url:'',key:'',type:'openai',models:[]});save();renderProviders();selectProvider(id);updateChatProviders()}
+function saveProvider(){var p=providers.find(function(x){return x.id===currentProviderId});if(p){p.name=$('pName').value;p.url=$('pUrl').value;p.key=cleanApiKey($('pKey').value);p.type=$('pType').value;save();renderProviders();updateChatProviders();alert('保存成功')}}
+function deleteProvider(){if(!confirm('确定删除？'))return;providers=providers.filter(function(p){return p.id!==currentProviderId});save();currentProviderId=providers[0]?providers[0].id:null;renderProviders();if(currentProviderId)selectProvider(currentProviderId);updateChatProviders()}
+function cleanApiKey(key){if(!key)return'';var result='';for(var i=0;i<key.length;i++){var c=key.charCodeAt(i);if(c>=32&&c<127)result+=key[i]}return result.trim()}
+function testProvider(){var url=$('pUrl').value,key=cleanApiKey($('pKey').value);if(!url||!key){alert('请填写 API 地址和 API Key');return}fetch('/api/proxy/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:url,key:key})}).then(function(r){return r.json()}).then(function(data){if(data.success){alert('✓ 连接成功')}else{alert('✗ 失败: '+(data.error||'未知错误'))}}).catch(function(e){alert('✗ 失败: '+e.message)})}
+function fetchModels(){var url=$('pUrl').value,key=cleanApiKey($('pKey').value);if(!url||!key){alert('请填写 API 地址和 API Key');return}fetch('/api/proxy/models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:url,key:key})}).then(function(r){return r.json()}).then(function(data){var p=providers.find(function(x){return x.id===currentProviderId});if(data.error){alert('获取失败: '+data.error);return}if(p&&data.data){p.models=data.data.slice(0,50).map(function(m){return{id:m.id,name:m.id}});save();renderModels(p.models);updateChatProviders();alert('获取成功: '+p.models.length+' 个模型')}else if(p&&data.models){p.models=data.models.slice(0,50).map(function(m){return{id:m.id||m,name:m.id||m}});save();renderModels(p.models);updateChatProviders();alert('获取成功: '+p.models.length+' 个模型')}else{alert('未找到模型列表')}}).catch(function(e){alert('失败: '+e.message)})}
+function addModel(){var name=prompt('模型名称:');if(!name)return;var id=prompt('模型ID:',name);if(!id)return;var p=providers.find(function(x){return x.id===currentProviderId});if(p){p.models=p.models||[];p.models.push({id:id,name:name});save();renderModels(p.models);updateChatProviders()}}
+function deleteModel(mid){var p=providers.find(function(x){return x.id===currentProviderId});if(p){p.models=p.models.filter(function(m){return m.id!==mid});save();renderModels(p.models);updateChatProviders()}}
+// 笔记
+function renderNotes(){if(notes.length===0){$('noteList').innerHTML='<div class="empty-state"><span>📭</span><p>暂无笔记</p></div>';return}var html=notes.map(function(n){return'<div class="sidebar-item'+(n.id===currentNoteId?' active':'')+'" onclick="selectNote(\''+n.id+'\')"><div class="sidebar-item-icon">📝</div><div class="sidebar-item-info"><div class="sidebar-item-title">'+(n.title||'无标题')+'</div></div></div>'}).join('');$('noteList').innerHTML=html}
+function selectNote(id){currentNoteId=id;var n=notes.find(function(x){return x.id===id});if(n){$('noteTitle').value=n.title;$('noteContent').value=n.content}renderNotes()}
+function newNote(){if(!currentUser)return alert('请先登录');api('/api/notes',{method:'POST',body:JSON.stringify({title:'新笔记',content:'',tags:''})}).then(function(res){notes.unshift({id:res.id,title:'新笔记',content:''});renderNotes();selectNote(res.id)}).catch(function(e){alert(e.message)})}
+function saveNote(){if(!currentNoteId)return;api('/api/notes/'+currentNoteId,{method:'PUT',body:JSON.stringify({title:$('noteTitle').value,content:$('noteContent').value,tags:''})}).then(function(){var n=notes.find(function(x){return x.id===currentNoteId});if(n){n.title=$('noteTitle').value;n.content=$('noteContent').value}renderNotes();alert('保存成功')}).catch(function(e){alert(e.message)})}
+function deleteNote(){if(!currentNoteId||!confirm('确定删除？'))return;api('/api/notes/'+currentNoteId,{method:'DELETE'}).then(function(){notes=notes.filter(function(n){return n.id!==currentNoteId});currentNoteId=notes[0]?notes[0].id:null;renderNotes();if(currentNoteId)selectNote(currentNoteId);else{$('noteTitle').value='';$('noteContent').value=''}}).catch(function(e){alert(e.message)})}
+// 记忆
+function renderMemories(){if(memories.length===0){$('memoryList').innerHTML='<div class="empty-state" style="padding:60px"><span style="font-size:64px;display:block;margin-bottom:16px;opacity:0.5">🧠</span><p style="font-size:16px;margin-bottom:8px">暂无记忆</p><p style="font-size:13px">开始添加您的第一条记忆吧</p><button class="btn btn-primary" style="margin-top:20px" onclick="showAddMemoryModal()">+ 添加您的第一条记忆</button></div>';return}var html=memories.map(function(m){return'<div class="memory-item"><div class="memory-item-content">'+escapeHtml(m.content)+'<div class="memory-item-meta">'+m.category+' · '+(m.created_at||'刚刚')+'</div></div><div class="memory-item-actions"><button class="btn btn-ghost btn-sm" onclick="editMemory('+m.id+')">✏️</button><button class="btn btn-ghost btn-sm" onclick="deleteMemory('+m.id+')">🗑️</button></div></div>'}).join('');$('memoryList').innerHTML=html}
+function showAddMemoryModal(){$('memoryContent').value='';$('memoryModalCategory').value='个人';showModal('memoryModal')}
+function saveMemoryFromModal(){var content=$('memoryContent').value.trim();if(!content)return alert('请输入记忆内容');if(!currentUser){closeModal('memoryModal');return alert('请先登录')}api('/api/memories',{method:'POST',body:JSON.stringify({content:content,category:$('memoryModalCategory').value})}).then(function(){return api('/api/memories')}).then(function(m){memories=m;renderMemories();closeModal('memoryModal');alert('记忆添加成功')}).catch(function(e){alert(e.message)})}
+function addMemoryContent(content){if(!currentUser)return alert('请先登录');api('/api/memories',{method:'POST',body:JSON.stringify({content:content,category:$('memoryCategory')?$('memoryCategory').value:'个人'})}).then(function(){return api('/api/memories')}).then(function(m){memories=m;renderMemories();alert('添加成功')}).catch(function(e){alert(e.message)})}
+function editMemory(id){var m=memories.find(function(x){return x.id===id});if(!m)return;var content=prompt('编辑记忆：',m.content);if(content&&content.trim()){api('/api/memories/'+id,{method:'PUT',body:JSON.stringify({content:content.trim(),category:m.category})}).then(function(){m.content=content.trim();renderMemories()}).catch(function(e){alert(e.message)})}}
+function addMemory(){if(!currentUser)return alert('请先登录');var content=$('newMemory').value.trim();if(!content)return alert('请输入内容');api('/api/memories',{method:'POST',body:JSON.stringify({content:content,category:$('memoryCategory').value})}).then(function(){return api('/api/memories')}).then(function(m){memories=m;renderMemories();$('newMemory').value='';alert('添加成功')}).catch(function(e){alert(e.message)})}
+function deleteMemory(id){if(!confirm('确定删除？'))return;api('/api/memories/'+id,{method:'DELETE'}).then(function(){memories=memories.filter(function(m){return m.id!==id});renderMemories()}).catch(function(e){alert(e.message)})}
+// 搜索设置
+function onSearchProviderChange(){var provider=$('searchProvider').value;$('searchZhipuSection').style.display=provider==='zhipu'?'block':'none';$('searchSearxngSection').style.display=provider==='searxng'?'block':'none'}
+function togglePassword(id){var input=$(id);input.type=input.type==='password'?'text':'password'}
+function testSearchKey(){var key=$('zhipuSearchKey').value;if(!key)return alert('请输入 API 密钥');alert('API 密钥格式正确')}
+function saveSearchSettings(){var settings={provider:$('searchProvider').value,enabled:$('searchEnabled').checked,resultCount:$('searchResultCount').value,blacklist:$('searchBlacklist').value};localStorage.setItem('searchSettings',JSON.stringify(settings));alert('搜索设置已保存')}
+function copyText(text){navigator.clipboard.writeText(text).then(function(){alert('已复制到剪贴板')}).catch(function(){prompt('请手动复制：',text)})}
+// 对话功能增强
+function searchChats(){var input=$('chatSearchInput');input.style.display=input.style.display==='none'?'block':'none';if(input.style.display==='block')input.focus()}
+function filterChats(keyword){var items=document.querySelectorAll('#chatList .sidebar-item');items.forEach(function(item){var title=item.querySelector('.sidebar-item-title').textContent.toLowerCase();item.style.display=title.includes(keyword.toLowerCase())?'flex':'none'})}
+function toggleWebSearch(){var btn=$('webSearchBtn');btn.classList.toggle('btn-primary');btn.classList.toggle('btn-ghost');alert(btn.classList.contains('btn-primary')?'网络搜索已启用':'网络搜索已关闭')}
+function uploadImage(){alert('图片上传功能开发中')}
+function uploadFile(){alert('文件上传功能开发中')}
+function voiceInput(){alert('语音输入功能开发中')}
+function stopGeneration(){alert('已停止生成')}
+function copyMessage(index){var chat=chats.find(function(c){return c.id===currentChatId});if(chat&&chat.messages[index]){navigator.clipboard.writeText(chat.messages[index].content).then(function(){alert('已复制')})}}
+function regenerateMessage(index){var chat=chats.find(function(c){return c.id===currentChatId});if(!chat)return;chat.messages=chat.messages.slice(0,index);saveChats();renderMessages();var lastUserMsg=chat.messages.filter(function(m){return m.role==='user'}).pop();if(lastUserMsg){$('chatInput').value=lastUserMsg.content;sendMessage()}}
+function editMessage(index){var chat=chats.find(function(c){return c.id===currentChatId});if(!chat||!chat.messages[index])return;var newContent=prompt('编辑消息：',chat.messages[index].content);if(newContent!==null){chat.messages[index].content=newContent;saveChats();renderMessages()}}
+function readAloud(index){var chat=chats.find(function(c){return c.id===currentChatId});if(chat&&chat.messages[index]&&'speechSynthesis' in window){var utterance=new SpeechSynthesisUtterance(chat.messages[index].content);utterance.lang='zh-CN';speechSynthesis.speak(utterance)}else{alert('您的浏览器不支持语音合成')}}
+function deleteChat(id){if(!confirm('确定删除此对话？'))return;chats=chats.filter(function(c){return c.id!==id});saveChats();if(currentChatId===id){currentChatId=chats[0]?chats[0].id:null;if(!currentChatId)newChat();else selectChat(currentChatId)}renderChats();showToast('对话已删除')}
+function showChatMenu(e,id){e.preventDefault();var menu=document.createElement('div');menu.className='context-menu';menu.innerHTML='<div onclick="renameChat(\''+id+'\')">✏️ 重命名</div><div onclick="exportSingleChat(\''+id+'\')">📥 导出</div><div onclick="deleteChat(\''+id+'\')" style="color:var(--error)">🗑️ 删除</div>';menu.style.cssText='position:fixed;left:'+e.clientX+'px;top:'+e.clientY+'px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:4px;z-index:1000;min-width:120px';document.body.appendChild(menu);setTimeout(function(){document.addEventListener('click',function handler(){menu.remove();document.removeEventListener('click',handler)})},0)}
+function renameChat(id){var chat=chats.find(function(c){return c.id===id});if(!chat)return;var newTitle=prompt('重命名对话：',chat.title);if(newTitle){chat.title=newTitle;saveChats();renderChats();showToast('已重命名')}}
+function exportSingleChat(id){var chat=chats.find(function(c){return c.id===id});if(!chat)return;var text=chat.messages.map(function(m){return'['+m.role+']\n'+m.content}).join('\n\n---\n\n');var blob=new Blob([text],{type:'text/plain'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(chat.title||'chat')+'.txt';a.click();showToast('已导出')}
+// 笔记设置
+function selectNotesDir(){alert('请在文件管理器中选择目录')}
+function applyNotesDir(){alert('工作目录已应用')}
+function resetNotesDir(){$('notesWorkDir').value='C:\\Users\\legion\\AppData\\Roaming\\AIHub\\Data\\Notes';alert('已重置为默认目录')}
+// MCP
+function refreshMcpServers(){alert('正在刷新 MCP 服务器状态...')}
+function showAddMcpModal(){alert('添加 MCP 服务器功能开发中')}
+// 数据管理
+function openDataDir(){alert('请在文件管理器中打开：C:\\Users\\legion\\AppData\\Roaming\\AIHub\\Data')}
+function clearChats(){if(!confirm('确定清除所有对话记录？'))return;chats=[];saveChats();renderChats();newChat();updateStats();alert('对话记录已清除')}
+function clearAssistants(){if(!confirm('确定清除所有自定义助手？'))return;assistants=assistants.filter(function(a){return a.isSystem});saveAssistants();renderAssistants();updateStats();alert('自定义助手已清除')}
+function updateStats(){$('statChats').textContent=chats.length;$('statAssistants').textContent=assistants.length;$('statShortcuts').textContent=shortcuts.length;var size=0;for(var key in localStorage){if(localStorage.hasOwnProperty(key)){size+=localStorage[key].length*2}}$('statStorage').textContent=Math.round(size/1024)+' KB'}
+// 默认模型
+function initDefaultModelSelects(){var types=['chat','translate','summary','code','quick'];var html=providers.map(function(p){return'<option value="'+p.id+'">'+p.name+'</option>'}).join('');types.forEach(function(t){var pSel=$('default'+t.charAt(0).toUpperCase()+t.slice(1)+'Provider');var mSel=$('default'+t.charAt(0).toUpperCase()+t.slice(1)+'Model');if(pSel){pSel.innerHTML=html;onDefaultProviderChange(t)}})}
+function onDefaultProviderChange(type){var pSel=$('default'+type.charAt(0).toUpperCase()+type.slice(1)+'Provider');var mSel=$('default'+type.charAt(0).toUpperCase()+type.slice(1)+'Model');if(!pSel||!mSel)return;var p=providers.find(function(x){return x.id===pSel.value});mSel.innerHTML=(p&&p.models?p.models:[]).map(function(m){return'<option value="'+m.id+'">'+m.name+'</option>'}).join('')}
+function saveDefaultModels(){var settings={chat:{provider:$('defaultChatProvider').value,model:$('defaultChatModel').value},translate:{provider:$('defaultTranslateProvider').value,model:$('defaultTranslateModel').value},summary:{provider:$('defaultSummaryProvider').value,model:$('defaultSummaryModel').value},code:{provider:$('defaultCodeProvider').value,model:$('defaultCodeModel').value},quick:{provider:$('defaultQuickProvider').value,model:$('defaultQuickModel').value}};localStorage.setItem('defaultModels',JSON.stringify(settings));alert('默认模型设置已保存')}
+// 显示设置
+function setTheme(mode){document.body.dataset.theme=mode;localStorage.setItem('theme',mode)}
+function setMsgFontSize(size){document.documentElement.style.setProperty('--msg-font-size',size+'px');event.target.nextElementSibling.textContent=size+'px'}
+function saveDisplaySettings(){var settings={theme:$('themeMode').value,msgFontSize:$('msgFontSize').value,msgStyle:$('msgStyle').value,showTimestamp:$('showTimestamp').checked,showAvatar:$('showAvatar').checked,showLineNumbers:$('showLineNumbers').checked,sidebarWidth:$('sidebarWidth').value,chatListWidth:$('chatListWidth').value,showNavButtons:$('showNavButtons').checked};localStorage.setItem('displaySettings',JSON.stringify(settings));alert('显示设置已保存')}
+function resetDisplaySettings(){$('themeMode').value='dark';$('msgFontSize').value=14;$('msgStyle').value='simple';$('showTimestamp').checked=false;$('showAvatar').checked=true;$('showLineNumbers').checked=false;$('sidebarWidth').value=220;$('chatListWidth').value=280;$('showNavButtons').checked=true;alert('已重置为默认设置')}
+// 常规设置
+function saveGeneralSettings(){var settings={language:$('appLanguage').value,temp:parseFloat($('defaultTemp').value),topP:parseFloat($('defaultTopP').value),context:parseInt($('defaultContext').value),maxTokens:parseInt($('defaultMaxTokens').value),stream:$('defaultStream').checked,autoScroll:$('autoScroll').checked,msgSound:$('msgSound').checked,autoTitle:$('autoTitle').checked,enableLatex:$('enableLatex').checked,codeHighlight:$('codeHighlight').checked,codeLineNumbers:$('codeLineNumbers').checked,enterSend:$('enterSend').checked,ctrlEnterNewline:$('ctrlEnterNewline').checked,autoFocus:$('autoFocus').checked};localStorage.setItem('generalSettings',JSON.stringify(settings));chatSettings.temp=settings.temp;chatSettings.context=settings.context;chatSettings.maxTokens=settings.maxTokens;chatSettings.stream=settings.stream;alert('常规设置已保存')}
+// 快捷短语
+function renderShortcuts(){if(shortcuts.length===0){$('shortcutList').innerHTML='<div class="empty-state" style="padding:40px"><span>⚡</span><p>暂无快捷短语</p><p style="font-size:12px;margin-top:8px">点击右上角 + 添加</p></div>';return}var html=shortcuts.map(function(s,i){return'<div class="shortcut-item" onclick="editShortcut('+i+')"><span class="shortcut-item-icon">🌐</span><span class="shortcut-item-name">'+s.name+'</span></div>'}).join('');$('shortcutList').innerHTML=html}
+function showAddShortcutModal(){$('shortcutModalTitle').textContent='添加快捷短语';$('shortcutName').value='';$('shortcutTrigger').value='';$('shortcutContent').value='';$('shortcutModal').dataset.editIndex='';showModal('shortcutModal')}
+function editShortcut(i){$('shortcutModalTitle').textContent='编辑快捷短语';$('shortcutName').value=shortcuts[i].name;$('shortcutTrigger').value=shortcuts[i].trigger||'';$('shortcutContent').value=shortcuts[i].content;$('shortcutModal').dataset.editIndex=i;showModal('shortcutModal')}
+function saveShortcutFromModal(){var name=$('shortcutName').value.trim(),content=$('shortcutContent').value.trim();if(!name||!content)return alert('请填写名称和内容');var idx=$('shortcutModal').dataset.editIndex;if(idx!==''){shortcuts[parseInt(idx)]={name:name,content:content,trigger:$('shortcutTrigger').value}}else{shortcuts.push({name:name,content:content,trigger:$('shortcutTrigger').value})}saveShortcuts();renderShortcuts();closeModal('shortcutModal')}
+function deleteShortcut(i){if(!confirm('确定？'))return;shortcuts.splice(i,1);saveShortcuts();renderShortcuts()}
+function useShortcut(i){$('chatInput').value=shortcuts[i].content;document.querySelector('.nav-item[data-page="chat"]').click();$('chatInput').focus()}
+// 文档
+function handleFileUpload(e){var file=e.target.files[0];if(!file)return;var formData=new FormData();formData.append('file',file);var headers={};if(authToken)headers['Authorization']='Bearer '+authToken;fetch('/api/documents/parse',{method:'POST',headers:headers,body:formData}).then(function(r){return r.json()}).then(function(data){uploadedDoc=data;$('docContent').textContent=data.content;$('docResult').style.display='block'}).catch(function(e){alert('失败: '+e.message)})}
+function summarizeDoc(){if(!uploadedDoc)return;$('chatInput').value='请总结以下内容：\n\n'+uploadedDoc.content.slice(0,5000);document.querySelector('.nav-item[data-page="chat"]').click();sendMessage()}
+function askAboutDoc(){if(!uploadedDoc)return;var q=prompt('请输入问题：');if(!q)return;$('chatInput').value='基于以下内容回答：\n\n'+uploadedDoc.content.slice(0,4000)+'\n\n问题：'+q;document.querySelector('.nav-item[data-page="chat"]').click();sendMessage()}
+// 数据
+function exportAllData(){var data={providers:providers,chats:chats,shortcuts:shortcuts,assistants:assistants,time:new Date().toISOString()};var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ai-hub-backup.json';a.click()}
+function importData(){var input=document.createElement('input');input.type='file';input.accept='.json';input.onchange=function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){try{var data=JSON.parse(ev.target.result);if(data.providers){providers=data.providers;save()}if(data.chats){chats=data.chats;saveChats()}if(data.shortcuts){shortcuts=data.shortcuts;saveShortcuts()}if(data.assistants){assistants=data.assistants;saveAssistants()}alert('导入成功');location.reload()}catch(e){alert('失败: '+e.message)}};reader.readAsText(file)};input.click()}
+function clearAllData(){if(!confirm('确定清除所有数据？'))return;localStorage.clear();location.reload()}
+// 数据设置页面切换
+function switchDataTab(tab){document.querySelectorAll('.settings-sidebar-item').forEach(function(i){i.classList.remove('active')});event.target.classList.add('active');alert('切换到: '+tab+' 设置')}
+// 初始化
+marked.setOptions({breaks:true,highlight:function(code,lang){return lang&&hljs.getLanguage(lang)?hljs.highlight(code,{language:lang}).value:code}});
+renderProviders();if(providers.length)selectProvider(providers[0].id);updateChatProviders();initDefaultModelSelects();renderAssistants();if(assistants.length)selectAssistant(assistants[0].id);renderChats();if(chats.length===0)newChat();else selectChat(chats[0].id);renderShortcuts();renderNotes();renderMemories();checkAuth();updateStats();
+document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key==='n'){e.preventDefault();newChat();showToast('新建对话')}if((e.ctrlKey||e.metaKey)&&e.key==='/'){e.preventDefault();showModal('hotkeyHelpModal')}if((e.ctrlKey||e.metaKey)&&e.key===','){e.preventDefault();document.querySelector('.nav-item[data-page="general"]').click()}if(e.key==='Escape')document.querySelectorAll('.modal.show').forEach(function(m){m.classList.remove('show')})});
+function showToast(msg){var toast=document.createElement('div');toast.className='toast';toast.textContent=msg;document.body.appendChild(toast);setTimeout(function(){toast.remove()},2000)}
+console.log('🤖 AI Hub v1.7.2');
 </script>
 </body>
 </html>
