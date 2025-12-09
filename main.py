@@ -171,9 +171,11 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
+from typing import Union, Any
+
 class ChatMessage(BaseModel):
     role: str
-    content: str
+    content: Union[str, List[Any]]  # 支持字符串或数组（图片消息）
 
 class ChatRequest(BaseModel):
     provider: str
