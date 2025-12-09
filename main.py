@@ -890,6 +890,69 @@ async def git_test(data: dict):
         else:
             return {"success": False, "error": f"HTTP {resp.status_code}"}
 
+# ========== 本地 Git 推送 ==========
+class LocalGitPushRequest(BaseModel):
+    repo_path: str
+    file_path: str
+    content: str
+    commit_message: str = "Add code from AI Hub"
+
+@app.post("/api/git/local/push")
+async def local_git_push(req: LocalGitPushRequest):
+    """推送代码到本地 Git 仓库"""
+    import subprocess
+    import os
+    
+    repo_path = req.repo_path.strip()
+    if not os.path.isdir(repo_path):
+        raise HTTPException(status_code=400, detail="仓库路径不存在")
+    
+    git_dir = os.path.join(repo_path, ".git")
+    if not os.path.isdir(git_dir):
+        raise HTTPException(status_code=400, detail="该目录不是 Git 仓库")
+    
+    # 写入文件
+    file_full_path = os.path.join(repo_path, req.file_path)
+    os.makedirs(os.path.dirname(file_full_path), exist_ok=True)
+    with open(file_full_path, "w", encoding="utf-8") as f:
+        f.write(req.content)
+    
+    try:
+        # Git add
+        subprocess.run(["git", "add", req.file_path], cwd=repo_path, check=True, capture_output=True)
+        # Git commit
+        subprocess.run(["git", "commit", "-m", req.commit_message], cwd=repo_path, check=True, capture_output=True)
+        # Git push
+        result = subprocess.run(["git", "push"], cwd=repo_path, capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            return {"success": True, "message": "推送成功", "output": result.stdout}
+        else:
+            return {"success": True, "message": "已提交，但推送失败（可能没有配置远程仓库）", "error": result.stderr}
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Git 操作失败: {e.stderr.decode() if e.stderr else str(e)}")
+
+@app.post("/api/git/local/test")
+async def local_git_test(data: dict):
+    """测试本地 Git 仓库"""
+    import os
+    import subprocess
+    
+    repo_path = data.get("repo_path", "").strip()
+    if not os.path.isdir(repo_path):
+        return {"success": False, "error": "路径不存在"}
+    
+    git_dir = os.path.join(repo_path, ".git")
+    if not os.path.isdir(git_dir):
+        return {"success": False, "error": "不是 Git 仓库"}
+    
+    try:
+        result = subprocess.run(["git", "remote", "-v"], cwd=repo_path, capture_output=True, text=True)
+        remotes = result.stdout.strip()
+        return {"success": True, "remotes": remotes if remotes else "无远程仓库"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 # ========== 静态文件 ==========
 @app.get("/")
 async def root():
