@@ -796,6 +796,100 @@ async def chat_completions(request: ChatRequest, user=Depends(get_current_user))
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"内部错误: {str(e)}")
 
+# ========== GitHub 推送 ==========
+class GitPushRequest(BaseModel):
+    repo_url: str
+    token: str
+    file_path: str
+    content: str
+    commit_message: str = "Add code from AI Hub"
+    branch: str = "main"
+
+@app.post("/api/git/push")
+async def git_push(req: GitPushRequest, user=Depends(get_current_user)):
+    """推送代码到 GitHub"""
+    import base64
+    import re
+    
+    # 解析仓库信息
+    match = re.match(r'https://github\.com/([^/]+)/([^/]+?)(?:\.git)?$', req.repo_url.strip())
+    if not match:
+        raise HTTPException(status_code=400, detail="无效的 GitHub 仓库地址")
+    
+    owner, repo = match.groups()
+    
+    async with httpx.AsyncClient(timeout=30) as client:
+        headers = {
+            "Authorization": f"token {req.token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        
+        # 获取文件的 SHA（如果存在）
+        sha = None
+        try:
+            resp = await client.get(
+                f"https://api.github.com/repos/{owner}/{repo}/contents/{req.file_path}",
+                headers=headers,
+                params={"ref": req.branch}
+            )
+            if resp.status_code == 200:
+                sha = resp.json().get("sha")
+        except:
+            pass
+        
+        # 创建或更新文件
+        payload = {
+            "message": req.commit_message,
+            "content": base64.b64encode(req.content.encode()).decode(),
+            "branch": req.branch
+        }
+        if sha:
+            payload["sha"] = sha
+        
+        resp = await client.put(
+            f"https://api.github.com/repos/{owner}/{repo}/contents/{req.file_path}",
+            headers=headers,
+            json=payload
+        )
+        
+        if resp.status_code in [200, 201]:
+            data = resp.json()
+            return {
+                "success": True,
+                "message": "推送成功",
+                "url": data.get("content", {}).get("html_url", ""),
+                "sha": data.get("content", {}).get("sha", "")
+            }
+        else:
+            error = resp.json().get("message", resp.text)
+            raise HTTPException(status_code=resp.status_code, detail=f"GitHub API 错误: {error}")
+
+@app.post("/api/git/test")
+async def git_test(data: dict):
+    """测试 GitHub 连接"""
+    repo_url = data.get("repo_url", "")
+    token = data.get("token", "")
+    
+    import re
+    match = re.match(r'https://github\.com/([^/]+)/([^/]+?)(?:\.git)?$', repo_url.strip())
+    if not match:
+        return {"success": False, "error": "无效的 GitHub 仓库地址"}
+    
+    owner, repo = match.groups()
+    
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(
+            f"https://api.github.com/repos/{owner}/{repo}",
+            headers={
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github.v3+json"
+            }
+        )
+        if resp.status_code == 200:
+            return {"success": True, "repo": resp.json().get("full_name")}
+        else:
+            return {"success": False, "error": f"HTTP {resp.status_code}"}
+
 # ========== 静态文件 ==========
 @app.get("/")
 async def root():
