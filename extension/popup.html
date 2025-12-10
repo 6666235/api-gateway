@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 360px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f1a;
+      color: #e8e8f0;
+    }
+    .header {
+      padding: 20px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      text-align: center;
+    }
+    .logo { font-size: 32px; margin-bottom: 8px; }
+    .title { font-size: 18px; font-weight: 600; }
+    .subtitle { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+    .content { padding: 16px; }
+    .section { margin-bottom: 16px; }
+    .section-title {
+      font-size: 12px;
+      color: #8888a0;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .input-group { margin-bottom: 12px; }
+    .input-group label {
+      display: block;
+      font-size: 13px;
+      color: #8888a0;
+      margin-bottom: 6px;
+    }
+    .input-group input {
+      width: 100%;
+      padding: 10px 12px;
+      background: #1a1a2e;
+      border: 1px solid #2d2d4a;
+      border-radius: 8px;
+      color: #e8e8f0;
+      font-size: 14px;
+    }
+    .input-group input:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+    .chat-box {
+      background: #1a1a2e;
+      border-radius: 12px;
+      padding: 12px;
+      min-height: 150px;
+      max-height: 200px;
+      overflow-y: auto;
+      margin-bottom: 12px;
+    }
+    .chat-input {
+      display: flex;
+      gap: 8px;
+    }
+    .chat-input input {
+      flex: 1;
+      padding: 10px 12px;
+      background: #1a1a2e;
+      border: 1px solid #2d2d4a;
+      border-radius: 8px;
+      color: #e8e8f0;
+      font-size: 14px;
+    }
+    .btn {
+      padding: 10px 16px;
+      background: #6366f1;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: #5855eb; }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid #2d2d4a;
+      color: #8888a0;
+    }
+    .btn-ghost:hover {
+      background: #1a1a2e;
+      color: #e8e8f0;
+    }
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .quick-btn {
+      padding: 12px;
+      background: #1a1a2e;
+      border: 1px solid #2d2d4a;
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .quick-btn:hover {
+      background: #252542;
+      border-color: #6366f1;
+    }
+    .quick-btn-icon { font-size: 20px; margin-bottom: 4px; }
+    .quick-btn-text { font-size: 12px; color: #8888a0; }
+    .message {
+      padding: 10px 12px;
+      border-radius: 10px;
+      margin-bottom: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .message.user {
+      background: #6366f1;
+      margin-left: 20%;
+    }
+    .message.assistant {
+      background: #252542;
+      margin-right: 20%;
+    }
+    .status {
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .status.success { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+    .status.error { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .footer {
+      padding: 12px 16px;
+      border-top: 1px solid #2d2d4a;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .footer a {
+      color: #6366f1;
+      text-decoration: none;
+      font-size: 13px;
+    }
+    .footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">🤖</div>
+    <div class="title">AI Hub</div>
+    <div class="subtitle">智能助手随时待命</div>
+  </div>
+  
+  <div class="content">
+    <div id="status" class="status" style="display: none;"></div>
+    
+    <div class="section">
+      <div class="section-title">快捷功能</div>
+      <div class="quick-actions">
+        <div class="quick-btn" onclick="quickAction('translate')">
+          <div class="quick-btn-icon">🌐</div>
+          <div class="quick-btn-text">翻译</div>
+        </div>
+        <div class="quick-btn" onclick="quickAction('summarize')">
+          <div class="quick-btn-icon">📝</div>
+          <div class="quick-btn-text">摘要</div>
+        </div>
+        <div class="quick-btn" onclick="quickAction('explain')">
+          <div class="quick-btn-icon">💡</div>
+          <div class="quick-btn-text">解释</div>
+        </div>
+        <div class="quick-btn" onclick="openHub()">
+          <div class="quick-btn-icon">🚀</div>
+          <div class="quick-btn-text">打开 Hub</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">快速对话</div>
+      <div class="chat-box" id="chatBox">
+        <div class="message assistant">你好！我是 AI Hub 助手，有什么可以帮你的？</div>
+      </div>
+      <div class="chat-input">
+        <input type="text" id="chatInput" placeholder="输入消息..." onkeypress="if(event.key==='Enter')sendChat()">
+        <button class="btn" onclick="sendChat()">发送</button>
+      </div>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">设置</div>
+      <div class="input-group">
+        <label>API 地址</label>
+        <input type="text" id="apiUrl" placeholder="http://localhost:8000">
+      </div>
+      <div class="input-group">
+        <label>API Token</label>
+        <input type="password" id="apiToken" placeholder="输入您的 Token">
+      </div>
+      <button class="btn" style="width: 100%;" onclick="saveSettings()">保存设置</button>
+    </div>
+  </div>
+  
+  <div class="footer">
+    <a href="http://localhost:8000" target="_blank">打开 AI Hub</a>
+    <span style="color: #8888a0; font-size: 12px;">v1.0.0</span>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
