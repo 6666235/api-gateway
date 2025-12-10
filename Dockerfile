@@ -29,6 +29,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 # 复制应用代码
 COPY main.py .
 COPY static/ ./static/
+COPY modules/ ./modules/
 
 # 创建非 root 用户
 RUN useradd -m -u 1000 appuser && \

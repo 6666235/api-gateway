@@ -5053,6 +5053,10 @@ class TaskQueue:
     
     def get_result(self, task_id: str) -> dict:
         return self.results.get(task_id, {"status": "not_found"})
+    
+    async def stop(self):
+        self.running = False
+        logger.info("Task queue stopped")
 
 task_queue = TaskQueue()
 
@@ -5469,123 +5473,6 @@ async def get_scheduled_jobs():
         return scheduler.get_jobs()
     except:
         return []
-
-# ========== 安全 API ==========
-@app.get("/api/security/status")
-async def get_security_status():
-    """获取安全状态"""
-    with sqlite3.connect(DB_PATH) as conn:
-        # 2FA 用户数
-        two_fa_users = conn.execute(
-            "SELECT COUNT(*) FROM users WHERE totp_enabled = 1"
-        ).fetchone()[0]
-        
-        # 失败登录尝试（从审计日志）
-        failed_attempts = conn.execute(
-            "SELECT COUNT(*) FROM audit_logs WHERE action = 'login_failed' AND created_at > datetime('now', '-1 day')"
-        ).fetchone()[0]
-    
-    return {
-        "blocked_ips": len(getattr(rate_limiter, 'blocked_ips', set())),
-        "failed_attempts_tracked": failed_attempts,
-        "2fa_enabled_users": two_fa_users,
-        "security_score": "A" if failed_attempts < 10 else "B"
-    }
-
-@app.post("/api/security/unblock-ip")
-async def unblock_ip(request: Request, user=Depends(get_current_user)):
-    """解封 IP"""
-    if not user:
-        raise HTTPException(status_code=401, detail="请先登录")
-    
-    data = await request.json()
-    ip = data.get("ip")
-    
-    if hasattr(rate_limiter, 'blocked_ips'):
-        rate_limiter.blocked_ips.discard(ip)
-    
-    # 记录审计日志
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
-            "INSERT INTO audit_logs (user_id, action, resource, details) VALUES (?, ?, ?, ?)",
-            (user["id"], "unblock_ip", "security", json.dumps({"ip": ip}))
-        )
-    
-    return {"success": True}
-
-# ========== 审计日志 API ==========
-@app.get("/api/audit/logs")
-async def get_audit_logs(days: int = 30, event: str = None, user=Depends(get_current_user)):
-    """获取审计日志"""
-    if not user:
-        raise HTTPException(status_code=401, detail="请先登录")
-    
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        query = "SELECT * FROM audit_logs WHERE created_at > datetime('now', '-{} days')".format(days)
-        if event:
-            query += f" AND action = '{event}'"
-        query += " ORDER BY created_at DESC LIMIT 200"
-        rows = conn.execute(query).fetchall()
-        return [dict(r) for r in rows]
-
-@app.post("/api/audit/export")
-async def export_audit_logs(request: Request, user=Depends(get_current_user)):
-    """导出审计日志"""
-    if not user:
-        raise HTTPException(status_code=401, detail="请先登录")
-    
-    data = await request.json()
-    days = data.get("days", 30)
-    
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT * FROM audit_logs WHERE created_at > datetime('now', '-{} days') ORDER BY created_at DESC".format(days)
-        ).fetchall()
-    
-    # 生成 CSV
-    import csv
-    import io
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["ID", "用户ID", "操作", "资源", "详情", "IP地址", "时间"])
-    for row in rows:
-        writer.writerow([row["id"], row["user_id"], row["action"], row["resource"], row["details"], row["ip_address"], row["created_at"]])
-    
-    return {
-        "filename": f"audit_logs_{datetime.now().strftime('%Y%m%d')}.csv",
-        "content": output.getvalue()
-    }
-
-@app.get("/api/audit/report")
-async def get_compliance_report(period: str = "monthly", user=Depends(get_current_user)):
-    """生成合规报告"""
-    if not user:
-        raise HTTPException(status_code=401, detail="请先登录")
-    
-    days = 30 if period == "monthly" else 7 if period == "weekly" else 1
-    
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        
-        # 事件统计
-        event_stats = conn.execute(
-            "SELECT action, COUNT(*) as count FROM audit_logs WHERE created_at > datetime('now', '-{} days') GROUP BY action".format(days)
-        ).fetchall()
-        
-        # 安全警报
-        security_alerts = conn.execute(
-            "SELECT COUNT(*) FROM audit_logs WHERE action IN ('login_failed', 'unauthorized_access') AND created_at > datetime('now', '-{} days')".format(days)
-        ).fetchone()[0]
-    
-    return {
-        "period": period,
-        "generated_at": datetime.now().isoformat(),
-        "event_summary": {row["action"]: row["count"] for row in event_stats},
-        "security_alerts": security_alerts,
-        "compliance_status": "compliant" if security_alerts < 10 else "review_needed"
-    }
 
 # 挂载静态文件
 from fastapi.staticfiles import StaticFiles
