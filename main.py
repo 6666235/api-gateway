@@ -11,13 +11,53 @@ import sqlite3
 import hashlib
 import secrets
 import time
+import base64
+import logging
 from datetime import datetime, timedelta
 from typing import Optional, AsyncGenerator, List
 from contextlib import contextmanager
 from collections import defaultdict
+from cryptography.fernet import Fernet
 import asyncio
 
 load_dotenv()
+
+# ========== 日志配置 ==========
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log', encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# ========== API Key 加密 ==========
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
+if not ENCRYPTION_KEY:
+    # 首次运行自动生成密钥
+    ENCRYPTION_KEY = Fernet.generate_key().decode()
+    with open(".env", "a") as f:
+        f.write(f"\nENCRYPTION_KEY={ENCRYPTION_KEY}")
+    logger.info("Generated new encryption key")
+
+cipher = Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
+
+def encrypt_api_key(key: str) -> str:
+    """加密 API Key"""
+    if not key:
+        return ""
+    return cipher.encrypt(key.encode()).decode()
+
+def decrypt_api_key(encrypted: str) -> str:
+    """解密 API Key"""
+    if not encrypted:
+        return ""
+    try:
+        return cipher.decrypt(encrypted.encode()).decode()
+    except:
+        return encrypted  # 兼容未加密的旧数据
 
 # ========== 速率限制 ==========
 class RateLimiter:
@@ -162,6 +202,27 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_api_logs_user ON api_logs(user_id);
             CREATE INDEX IF NOT EXISTS idx_api_logs_created ON api_logs(created_at);
+            CREATE TABLE IF NOT EXISTS prompt_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                name TEXT NOT NULL,
+                content TEXT NOT NULL,
+                category TEXT DEFAULT 'general',
+                is_public INTEGER DEFAULT 0,
+                use_count INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+            CREATE TABLE IF NOT EXISTS shared_conversations (
+                id TEXT PRIMARY KEY,
+                conversation_id TEXT,
+                user_id INTEGER,
+                expires_at TIMESTAMP,
+                view_count INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (conversation_id) REFERENCES conversations(id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
         ''')
 
 init_db()
@@ -419,6 +480,43 @@ async def delete_conversation(conv_id: str):
         conn.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
     return {"success": True}
 
+@app.get("/api/search")
+async def search_messages(q: str, user=Depends(get_current_user)):
+    """搜索对话内容"""
+    if not q or len(q) < 2:
+        return {"results": []}
+    user_id = user["id"] if user else 0
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT m.*, c.title as conv_title 
+            FROM messages m 
+            JOIN conversations c ON m.conversation_id = c.id 
+            WHERE c.user_id = ? AND m.content LIKE ? 
+            ORDER BY m.created_at DESC LIMIT 50
+        """, (user_id, f"%{q}%")).fetchall()
+        return {"results": [dict(r) for r in rows]}
+
+@app.post("/api/tokens/estimate")
+async def estimate_tokens(data: dict):
+    """估算 Token 数量"""
+    text = data.get("text", "")
+    model = data.get("model", "gpt-4")
+    try:
+        import tiktoken
+        try:
+            enc = tiktoken.encoding_for_model(model)
+        except:
+            enc = tiktoken.get_encoding("cl100k_base")
+        tokens = len(enc.encode(text))
+        return {"tokens": tokens, "model": model}
+    except Exception as e:
+        # 简单估算：中文约1.5字符/token，英文约4字符/token
+        chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+        other_chars = len(text) - chinese_chars
+        estimated = int(chinese_chars / 1.5 + other_chars / 4)
+        return {"tokens": estimated, "model": model, "estimated": True}
+
 @app.get("/api/conversations/{conv_id}/export")
 async def export_conversation(conv_id: str, format: str = "markdown"):
     """导出对话为 Markdown 或 JSON"""
@@ -467,6 +565,105 @@ async def export_conversation(conv_id: str, format: str = "markdown"):
             lines.append("")
         
         return {"content": "\n".join(lines), "filename": f"{conv['title'] or 'chat'}_{conv_id}.md"}
+
+# ========== Prompt 模板 ==========
+@app.get("/api/prompts")
+async def list_prompts(category: str = None, user=Depends(get_current_user)):
+    """获取 Prompt 模板列表"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        user_id = user["id"] if user else 0
+        if category:
+            rows = conn.execute(
+                "SELECT * FROM prompt_templates WHERE (user_id = ? OR is_public = 1) AND category = ? ORDER BY use_count DESC",
+                (user_id, category)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM prompt_templates WHERE user_id = ? OR is_public = 1 ORDER BY use_count DESC",
+                (user_id,)
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+@app.post("/api/prompts")
+async def create_prompt(data: dict, user=Depends(get_current_user)):
+    """创建 Prompt 模板"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO prompt_templates (user_id, name, content, category, is_public) VALUES (?, ?, ?, ?, ?)",
+            (user["id"], data.get("name"), data.get("content"), data.get("category", "general"), data.get("is_public", 0))
+        )
+    return {"success": True}
+
+@app.put("/api/prompts/{prompt_id}")
+async def update_prompt(prompt_id: int, data: dict, user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "UPDATE prompt_templates SET name=?, content=?, category=? WHERE id=? AND user_id=?",
+            (data.get("name"), data.get("content"), data.get("category"), prompt_id, user["id"])
+        )
+    return {"success": True}
+
+@app.delete("/api/prompts/{prompt_id}")
+async def delete_prompt(prompt_id: int, user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM prompt_templates WHERE id=? AND user_id=?", (prompt_id, user["id"]))
+    return {"success": True}
+
+@app.post("/api/prompts/{prompt_id}/use")
+async def use_prompt(prompt_id: int):
+    """记录 Prompt 使用次数"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("UPDATE prompt_templates SET use_count = use_count + 1 WHERE id = ?", (prompt_id,))
+    return {"success": True}
+
+# ========== 对话分享 ==========
+@app.post("/api/conversations/{conv_id}/share")
+async def share_conversation(conv_id: str, user=Depends(get_current_user)):
+    """创建对话分享链接"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    share_id = secrets.token_urlsafe(12)
+    expires = datetime.now() + timedelta(days=7)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO shared_conversations (id, conversation_id, user_id, expires_at) VALUES (?, ?, ?, ?)",
+            (share_id, conv_id, user["id"], expires)
+        )
+    return {"share_id": share_id, "url": f"/share/{share_id}", "expires_at": expires.isoformat()}
+
+@app.get("/api/share/{share_id}")
+async def get_shared_conversation(share_id: str):
+    """获取分享的对话"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        share = conn.execute(
+            "SELECT * FROM shared_conversations WHERE id = ? AND expires_at > ?",
+            (share_id, datetime.now())
+        ).fetchone()
+        if not share:
+            raise HTTPException(status_code=404, detail="分享链接不存在或已过期")
+        
+        # 更新查看次数
+        conn.execute("UPDATE shared_conversations SET view_count = view_count + 1 WHERE id = ?", (share_id,))
+        
+        conv = conn.execute("SELECT * FROM conversations WHERE id = ?", (share["conversation_id"],)).fetchone()
+        messages = conn.execute(
+            "SELECT role, content, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at",
+            (share["conversation_id"],)
+        ).fetchall()
+        
+        return {
+            "conversation": dict(conv) if conv else None,
+            "messages": [dict(m) for m in messages],
+            "view_count": share["view_count"] + 1
+        }
 
 # ========== 笔记功能 ==========
 @app.get("/api/notes")
@@ -1188,6 +1385,11 @@ STATIC_DIR = BASE_DIR / "static"
 @app.get("/")
 async def root():
     return FileResponse(STATIC_DIR / "index.html")
+
+@app.get("/share/{share_id}")
+async def share_page(share_id: str):
+    """分享页面"""
+    return FileResponse(STATIC_DIR / "share.html")
 
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

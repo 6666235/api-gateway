@@ -203,9 +203,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .context-menu div{padding:8px 12px;cursor:pointer;font-size:13px;border-radius:4px}
 .context-menu div:hover{background:var(--bg3)}
 .sidebar-item:hover .chat-delete-btn{opacity:1!important}
+/* 移动端适配 */
+@media(max-width:768px){
+.nav{position:fixed;left:-220px;z-index:100;height:100vh;transition:left .3s}
+.nav.show{left:0}
+.sidebar{width:100%;position:fixed;left:-100%;z-index:99;height:100vh;transition:left .3s}
+.sidebar.show{left:0}
+.content{width:100%}
+.mobile-menu-btn{display:flex!important}
+.chat-input-box{flex-wrap:wrap}
+.chat-toolbar{flex-wrap:wrap;gap:4px}
+.chat-toolbar .btn{padding:6px 10px;font-size:11px}
+.message{max-width:95%}
+.settings-panel{padding:12px}
+.form-row{flex-direction:column}
+}
+@media(min-width:769px){.mobile-menu-btn{display:none!important}}
+.mobile-menu-btn{position:fixed;top:12px;left:12px;z-index:101;width:40px;height:40px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;display:none;align-items:center;justify-content:center;cursor:pointer;font-size:20px}
+.mobile-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:98;display:none}
+.mobile-overlay.show{display:block}
 </style>
 </head>
 <body>
+<div class="mobile-menu-btn" onclick="toggleMobileNav()">☰</div>
+<div class="mobile-overlay" onclick="closeMobileMenus()"></div>
 <nav class="nav">
 <div class="nav-header"><div class="nav-logo"><span>🤖</span> AI Hub</div></div>
 <div class="nav-section">
@@ -274,8 +295,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <button class="btn btn-ghost btn-sm" onclick="uploadImage()" title="上传图片">🖼️</button>
 <button class="btn btn-ghost btn-sm" onclick="uploadFile()" title="上传文件">📎</button>
 <button class="btn btn-ghost btn-sm" onclick="voiceInput()" title="语音输入">🎤</button>
+<button class="btn btn-ghost btn-sm" onclick="estimateTokens()" title="估算 Token">🔢</button>
+<button class="btn btn-ghost btn-sm" onclick="showSearchModal()" title="搜索 Ctrl+K">🔍</button>
+<button class="btn btn-ghost btn-sm" onclick="toggleTheme()" title="切换主题 Ctrl+D">🌓</button>
 <div style="flex:1"></div>
 <button class="btn btn-ghost btn-sm" onclick="clearChat()">🗑️ 清空</button>
+<button class="btn btn-ghost btn-sm" onclick="shareChat()" title="分享对话">🔗 分享</button>
 <div style="position:relative;display:inline-block"><button class="btn btn-ghost btn-sm" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block'">📥 导出</button><div style="display:none;position:absolute;bottom:100%;left:0;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:4px;min-width:100px;z-index:100"><div style="padding:8px 12px;cursor:pointer;border-radius:4px;font-size:12px" onclick="exportChat('txt');this.parentElement.style.display='none'" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">📄 TXT</div><div style="padding:8px 12px;cursor:pointer;border-radius:4px;font-size:12px" onclick="exportChat('md');this.parentElement.style.display='none'" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">📝 Markdown</div><div style="padding:8px 12px;cursor:pointer;border-radius:4px;font-size:12px" onclick="exportChat('json');this.parentElement.style.display='none'" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">📋 JSON</div></div></div>
 </div>
 <div class="chat-input-box">
@@ -1155,9 +1180,36 @@ function pushToLocalGit(content,filename,message){if(!localGitSettings.repoPath)
 // 初始化
 marked.setOptions({breaks:true,highlight:function(code,lang){return lang&&hljs.getLanguage(lang)?hljs.highlight(code,{language:lang}).value:code}});
 renderProviders();if(providers.length)selectProvider(providers[0].id);updateChatProviders();initDefaultModelSelects();renderAssistants();if(assistants.length)selectAssistant(assistants[0].id);renderChats();if(chats.length===0)newChat();else selectChat(chats[0].id);renderShortcuts();renderNotes();renderMemories();checkAuth();updateStats();loadGithubSettings();loadLocalGitSettings();
-document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key==='n'){e.preventDefault();newChat();showToast('新建对话')}if((e.ctrlKey||e.metaKey)&&e.key==='/'){e.preventDefault();showModal('hotkeyHelpModal')}if((e.ctrlKey||e.metaKey)&&e.key===','){e.preventDefault();document.querySelector('.nav-item[data-page="general"]').click()}if(e.key==='Escape')document.querySelectorAll('.modal.show').forEach(function(m){m.classList.remove('show')})});
+// 快捷键
+document.addEventListener('keydown',function(e){
+if((e.ctrlKey||e.metaKey)&&e.key==='n'){e.preventDefault();newChat();showToast('新建对话')}
+if((e.ctrlKey||e.metaKey)&&e.key==='/'){e.preventDefault();showModal('hotkeyHelpModal')}
+if((e.ctrlKey||e.metaKey)&&e.key===','){e.preventDefault();document.querySelector('.nav-item[data-page="general"]').click()}
+if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();showSearchModal()}
+if((e.ctrlKey||e.metaKey)&&e.key==='d'){e.preventDefault();toggleTheme()}
+if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key==='E'){e.preventDefault();exportChat('md')}
+if(e.key==='Escape'){document.querySelectorAll('.modal.show').forEach(function(m){m.classList.remove('show')});hideSearchModal()}
+});
+// 主题切换
+function toggleTheme(){var current=document.documentElement.getAttribute('data-theme');var newTheme=current==='light'?'dark':'light';document.documentElement.setAttribute('data-theme',newTheme);localStorage.setItem('theme',newTheme);showToast(newTheme==='light'?'☀️ 亮色模式':'🌙 暗色模式')}
+function initTheme(){var saved=localStorage.getItem('theme');if(saved)document.documentElement.setAttribute('data-theme',saved)}
+initTheme();
+// 全局搜索
+var searchModal=null;
+function showSearchModal(){if(!searchModal){searchModal=document.createElement('div');searchModal.innerHTML='<div style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:2000;display:flex;align-items:flex-start;justify-content:center;padding-top:100px" onclick="if(event.target===this)hideSearchModal()"><div style="background:var(--bg2);border-radius:16px;width:90%;max-width:600px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)"><div style="padding:16px;border-bottom:1px solid var(--border)"><input type="text" id="globalSearchInput" placeholder="搜索对话内容... (Ctrl+K)" style="width:100%;padding:12px 16px;border:none;background:var(--bg);border-radius:8px;color:var(--text);font-size:16px" oninput="doGlobalSearch(this.value)"></div><div id="searchResults" style="max-height:400px;overflow-y:auto;padding:8px"></div><div style="padding:12px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--text2)">💡 Ctrl+D 切换主题 · Ctrl+N 新建对话 · Ctrl+Shift+E 导出</div></div></div>';document.body.appendChild(searchModal)}searchModal.style.display='block';setTimeout(function(){$('globalSearchInput').focus()},100)}
+function hideSearchModal(){if(searchModal)searchModal.style.display='none'}
+function doGlobalSearch(q){if(!q||q.length<2){$('searchResults').innerHTML='<div style="padding:40px;text-align:center;color:var(--text2)">输入关键词搜索...</div>';return}var results=[];chats.forEach(function(c){c.messages.forEach(function(m,i){if(typeof m.content==='string'&&m.content.toLowerCase().includes(q.toLowerCase())){results.push({chatId:c.id,chatTitle:c.title,msgIndex:i,role:m.role,content:m.content,match:q})}})});if(results.length===0){$('searchResults').innerHTML='<div style="padding:40px;text-align:center;color:var(--text2)">未找到结果</div>';return}var html=results.slice(0,20).map(function(r){var snippet=r.content.substring(0,150).replace(new RegExp('('+q+')','gi'),'<mark style="background:var(--warning);color:#000;padding:0 2px;border-radius:2px">$1</mark>');return'<div style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border)" onclick="goToSearchResult(\''+r.chatId+'\','+r.msgIndex+')" onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'"><div style="font-size:13px;color:var(--text2);margin-bottom:4px">'+(r.role==='user'?'👤':'🤖')+' '+r.chatTitle+'</div><div style="font-size:14px;line-height:1.5">'+snippet+'...</div></div>'}).join('');$('searchResults').innerHTML=html}
+function goToSearchResult(chatId,msgIndex){hideSearchModal();selectChat(chatId);setTimeout(function(){var msgs=document.querySelectorAll('.message');if(msgs[msgIndex]){msgs[msgIndex].scrollIntoView({behavior:'smooth',block:'center'});msgs[msgIndex].style.background='var(--accent)';msgs[msgIndex].style.transition='background 0.3s';setTimeout(function(){msgs[msgIndex].style.background=''},1500)}},200)}
+// Token 估算
+function estimateTokens(){var text=$('chatInput').value;if(!text)return;fetch('/api/tokens/estimate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,model:$('chatModel').value})}).then(function(r){return r.json()}).then(function(data){showToast('预估 '+data.tokens+' tokens'+(data.estimated?' (估算)':''))}).catch(function(e){console.error(e)})}
 function showToast(msg){var toast=document.createElement('div');toast.className='toast';toast.textContent=msg;document.body.appendChild(toast);setTimeout(function(){toast.remove()},2000)}
-console.log('🤖 AI Hub v1.7.2');
+// 分享对话
+function shareChat(){if(!authToken){alert('请先登录');return}if(!currentChatId){alert('请先选择对话');return}api('/api/conversations/'+currentChatId+'/share',{method:'POST'}).then(function(data){var url=window.location.origin+data.url;if(navigator.clipboard){navigator.clipboard.writeText(url);showToast('分享链接已复制!')}prompt('分享链接 (7天有效):',url)}).catch(function(e){alert('分享失败: '+e.message)})}
+// 移动端菜单
+function toggleMobileNav(){document.querySelector('.nav').classList.toggle('show');document.querySelector('.mobile-overlay').classList.toggle('show')}
+function toggleMobileSidebar(){document.querySelector('.sidebar').classList.toggle('show');document.querySelector('.mobile-overlay').classList.toggle('show')}
+function closeMobileMenus(){document.querySelector('.nav').classList.remove('show');document.querySelector('.sidebar').classList.remove('show');document.querySelector('.mobile-overlay').classList.remove('show')}
+console.log('🤖 AI Hub v1.8.0');
 </script>
 </body>
 </html>
