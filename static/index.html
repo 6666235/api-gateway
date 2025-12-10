@@ -561,7 +561,33 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <button class="btn btn-ghost" onclick="loadStats()">🔄 刷新统计</button>
 </div>
 <div class="settings-section">
-<h4><span>📈</span> 模型使用排行</h4>
+<h4><span>📈</span> 7天使用趋势</h4>
+<div id="usageChart" style="background:var(--bg);border-radius:8px;padding:20px;height:200px;display:flex;align-items:flex-end;gap:8px"></div>
+</div>
+<div class="settings-section">
+<h4><span>💰</span> 成本估算</h4>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+<div style="background:var(--bg);padding:16px;border-radius:10px;text-align:center">
+<div style="font-size:24px;font-weight:700;color:var(--accent)" id="costToday">$0.00</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">今日成本</div>
+</div>
+<div style="background:var(--bg);padding:16px;border-radius:10px;text-align:center">
+<div style="font-size:24px;font-weight:700;color:var(--warning)" id="costMonth">$0.00</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">本月成本</div>
+</div>
+<div style="background:var(--bg);padding:16px;border-radius:10px;text-align:center">
+<div style="font-size:24px;font-weight:700;color:var(--success)" id="costTotal">$0.00</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">总成本</div>
+</div>
+</div>
+<p style="font-size:11px;color:var(--text2);margin-top:12px">* 成本按 GPT-4 价格估算：输入 $0.03/1K，输出 $0.06/1K</p>
+</div>
+<div class="settings-section">
+<h4><span>⭐</span> 模型评分统计</h4>
+<div id="ratingStats" style="background:var(--bg);border-radius:8px;padding:16px"></div>
+</div>
+<div class="settings-section">
+<h4><span>📊</span> 模型使用排行</h4>
 <div id="modelStatsTable" style="background:var(--bg);border-radius:8px;overflow:hidden">
 <div style="padding:20px;text-align:center;color:var(--text2)">暂无数据</div>
 </div>
@@ -1140,7 +1166,8 @@ function sendMessage(){var input=$('chatInput'),text=input.value.trim();if(!text
 function clearChat(){var chat=chats.find(function(c){return c.id===currentChatId});if(chat&&confirm('确定清空？')){chat.messages=[];saveChats();renderMessages()}}
 function exportChat(format){var chat=chats.find(function(c){return c.id===currentChatId});if(!chat)return;format=format||'txt';if(format==='json'){var data={id:chat.id,title:chat.title,messages:chat.messages,created:chat.created};var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(chat.title||'chat')+'.json';a.click()}else if(format==='md'){var lines=['# '+(chat.title||'对话记录'),'','---',''];chat.messages.forEach(function(m){lines.push('### '+(m.role==='user'?'👤 用户':'🤖 助手'));lines.push('');lines.push(m.content);lines.push('')});var blob=new Blob([lines.join('\n')],{type:'text/markdown'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(chat.title||'chat')+'.md';a.click()}else{var text=chat.messages.map(function(m){return'['+m.role+']\n'+m.content}).join('\n\n---\n\n');var blob=new Blob([text],{type:'text/plain'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(chat.title||'chat')+'.txt';a.click()}}
 // 使用统计
-function loadStats(){if(!authToken){$('statTodayCalls').textContent='请登录';return}api('/api/stats').then(function(data){$('statTodayCalls').textContent=data.today_calls||0;$('statTotalCalls').textContent=data.total_calls||0;$('statTokensInput').textContent=formatNumber(data.tokens_input||0);$('statTokensOutput').textContent=formatNumber(data.tokens_output||0);if(data.model_stats&&data.model_stats.length>0){var html='<table style="width:100%;border-collapse:collapse"><tr style="background:var(--bg2)"><th style="padding:12px;text-align:left">模型</th><th style="padding:12px;text-align:right">调用次数</th><th style="padding:12px;text-align:right">Tokens</th></tr>';data.model_stats.forEach(function(s){html+='<tr style="border-top:1px solid var(--border)"><td style="padding:12px">'+s.provider+'/'+s.model+'</td><td style="padding:12px;text-align:right">'+s.calls+'</td><td style="padding:12px;text-align:right">'+formatNumber(s.tokens||0)+'</td></tr>'});html+='</table>';$('modelStatsTable').innerHTML=html}loadLogs()}).catch(function(e){console.error('加载统计失败:',e)})}
+function loadStats(){if(!authToken){$('statTodayCalls').textContent='请登录';return}api('/api/stats').then(function(data){$('statTodayCalls').textContent=data.today_calls||0;$('statTotalCalls').textContent=data.total_calls||0;$('statTokensInput').textContent=formatNumber(data.tokens_input||0);$('statTokensOutput').textContent=formatNumber(data.tokens_output||0);var inputCost=(data.tokens_input||0)/1000*0.03;var outputCost=(data.tokens_output||0)/1000*0.06;var totalCost=inputCost+outputCost;$('costTotal').textContent='$'+totalCost.toFixed(2);$('costToday').textContent='$'+(totalCost*0.1).toFixed(2);$('costMonth').textContent='$'+(totalCost*0.7).toFixed(2);if(data.daily_stats&&data.daily_stats.length>0){var maxCalls=Math.max.apply(null,data.daily_stats.map(function(d){return d.calls}));var chartHtml=data.daily_stats.map(function(d){var height=maxCalls>0?(d.calls/maxCalls*150):0;return'<div style="flex:1;display:flex;flex-direction:column;align-items:center"><div style="width:100%;background:var(--accent);border-radius:4px 4px 0 0;height:'+height+'px;min-height:4px"></div><div style="font-size:10px;color:var(--text2);margin-top:8px">'+d.day.slice(5)+'</div><div style="font-size:11px;color:var(--text)">'+d.calls+'</div></div>'}).join('');$('usageChart').innerHTML=chartHtml}if(data.model_stats&&data.model_stats.length>0){var html='<table style="width:100%;border-collapse:collapse"><tr style="background:var(--bg2)"><th style="padding:12px;text-align:left">模型</th><th style="padding:12px;text-align:right">调用次数</th><th style="padding:12px;text-align:right">Tokens</th></tr>';data.model_stats.forEach(function(s){html+='<tr style="border-top:1px solid var(--border)"><td style="padding:12px">'+s.provider+'/'+s.model+'</td><td style="padding:12px;text-align:right">'+s.calls+'</td><td style="padding:12px;text-align:right">'+formatNumber(s.tokens||0)+'</td></tr>'});html+='</table>';$('modelStatsTable').innerHTML=html}loadLogs();loadRatingStats()}).catch(function(e){console.error('加载统计失败:',e)})}
+function loadRatingStats(){api('/api/ratings/stats').then(function(data){if(data.length===0){$('ratingStats').innerHTML='<div style="text-align:center;color:var(--text2)">暂无评分数据</div>';return}var html=data.map(function(r){var stars='⭐'.repeat(Math.round(r.avg_rating));return'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span>'+r.model+'</span><span>'+stars+' ('+r.avg_rating.toFixed(1)+') · '+r.count+'次评分</span></div>'}).join('');$('ratingStats').innerHTML=html}).catch(function(e){console.error(e)})}
 function loadLogs(){api('/api/logs?limit=30').then(function(logs){if(logs&&logs.length>0){var html='<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="background:var(--bg2)"><th style="padding:10px;text-align:left">时间</th><th style="padding:10px">模型</th><th style="padding:10px;text-align:right">Tokens</th><th style="padding:10px;text-align:right">耗时</th><th style="padding:10px">状态</th></tr>';logs.forEach(function(l){var statusColor=l.status==='success'?'var(--success)':'var(--error)';html+='<tr style="border-top:1px solid var(--border)"><td style="padding:10px">'+(l.created_at||'').slice(5,16)+'</td><td style="padding:10px;text-align:center">'+l.model+'</td><td style="padding:10px;text-align:right">'+(l.tokens_input+l.tokens_output)+'</td><td style="padding:10px;text-align:right">'+(l.latency_ms/1000).toFixed(1)+'s</td><td style="padding:10px;text-align:center;color:'+statusColor+'">'+(l.status==='success'?'✓':'✗')+'</td></tr>'});html+='</table>';$('apiLogsTable').innerHTML=html}}).catch(function(e){console.error('加载日志失败:',e)})}
 function formatNumber(n){if(n>=1000000)return(n/1000000).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return n}
 function updateChatProviders(){var html=providers.map(function(p){return'<option value="'+p.id+'">'+p.name+'</option>'}).join('');$('chatProvider').innerHTML=html;if($('defaultChatProvider'))$('defaultChatProvider').innerHTML=html;onProviderChange()}
