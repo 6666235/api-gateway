@@ -211,7 +211,7 @@ async def invite_to_session(session_id: str, data: dict, user=None):
         raise HTTPException(status_code=401, detail="请先登录")
     
     invitee_id = data.get("user_id")
-    role = ColRole(data.get("role", "viewer"))
+    role = CollaborationRole(data.get("role", "viewer"))
     
     token = collaboration.invite_user(session_id, user["id"], invitee_id, role)
     if not token:
@@ -248,7 +248,7 @@ async def collaboration_websocket(websocket: WebSocket, session_id: str):
     
     # 加入会话
     joined = await collaboration.join_session(
-        session_id, user_id, username, websocket, ColRole.EDITOR
+        session_id, user_id, username, websocket, CollaborationRole.EDITOR
     )
     
     if not joined:
