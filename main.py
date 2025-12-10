@@ -1330,6 +1330,219 @@ async def get_workflow_templates():
     """获取预设工作流模板"""
     return WORKFLOW_TEMPLATES
 
+# ========== 多 Agent 协作 ==========
+class Agent:
+    """AI Agent 基类"""
+    def __init__(self, name: str, role: str, model: str = "gpt-4o-mini"):
+        self.name = name
+        self.role = role
+        self.model = model
+        self.memory = []
+    
+    async def think(self, task: str, context: dict = None) -> str:
+        """Agent 思考并执行任务"""
+        system_prompt = f"你是 {self.name}，角色是 {self.role}。请根据你的角色完成任务。"
+        
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        if context:
+            messages.append({"role": "user", "content": f"上下文信息：{json.dumps(context, ensure_ascii=False)}"})
+        
+        messages.append({"role": "user", "content": task})
+        
+        api_key = os.getenv("OPENAI_API_KEY", "")
+        if not api_key:
+            return f"[{self.name}] 未配置 API Key"
+        
+        async with httpx.AsyncClient(timeout=60) as client:
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={"model": self.model, "messages": messages, "max_tokens": 1000}
+            )
+            if response.status_code == 200:
+                result = response.json()["choices"][0]["message"]["content"]
+                self.memory.append({"task": task, "result": result})
+                return result
+        
+        return f"[{self.name}] 执行失败"
+
+class MultiAgentSystem:
+    """多 Agent 协作系统"""
+    def __init__(self):
+        self.agents = {}
+        self.conversations = {}
+    
+    def add_agent(self, agent: Agent):
+        self.agents[agent.name] = agent
+    
+    async def collaborate(self, task: str, agent_names: list, mode: str = "sequential") -> dict:
+        """多 Agent 协作执行任务"""
+        results = {}
+        context = {"task": task}
+        
+        if mode == "sequential":
+            # 顺序执行
+            for name in agent_names:
+                if name in self.agents:
+                    result = await self.agents[name].think(task, context)
+                    results[name] = result
+                    context[f"{name}_result"] = result
+        
+        elif mode == "parallel":
+            # 并行执行
+            import asyncio
+            tasks = []
+            for name in agent_names:
+                if name in self.agents:
+                    tasks.append(self.agents[name].think(task, context))
+            
+            if tasks:
+                parallel_results = await asyncio.gather(*tasks)
+                for i, name in enumerate(agent_names):
+                    if i < len(parallel_results):
+                        results[name] = parallel_results[i]
+        
+        elif mode == "debate":
+            # 辩论模式
+            for round_num in range(3):  # 3轮辩论
+                for name in agent_names:
+                    if name in self.agents:
+                        debate_task = f"第{round_num + 1}轮辩论。任务：{task}\n\n其他观点：{json.dumps(results, ensure_ascii=False)}"
+                        result = await self.agents[name].think(debate_task, context)
+                        results[f"{name}_round{round_num + 1}"] = result
+        
+        return results
+
+# 预设 Agent
+multi_agent_system = MultiAgentSystem()
+multi_agent_system.add_agent(Agent("分析师", "数据分析和问题诊断专家"))
+multi_agent_system.add_agent(Agent("程序员", "代码编写和技术实现专家"))
+multi_agent_system.add_agent(Agent("评审员", "代码审查和质量把控专家"))
+multi_agent_system.add_agent(Agent("产品经理", "需求分析和产品设计专家"))
+multi_agent_system.add_agent(Agent("测试员", "测试用例设计和质量验证专家"))
+
+@app.get("/api/agents")
+async def list_agents():
+    """获取所有 Agent"""
+    return [{"name": a.name, "role": a.role, "model": a.model} for a in multi_agent_system.agents.values()]
+
+@app.post("/api/agents/collaborate")
+async def agent_collaborate(data: dict, user=Depends(get_current_user)):
+    """多 Agent 协作"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    task = data.get("task", "")
+    agents = data.get("agents", ["分析师", "程序员"])
+    mode = data.get("mode", "sequential")  # sequential, parallel, debate
+    
+    results = await multi_agent_system.collaborate(task, agents, mode)
+    return {"task": task, "mode": mode, "results": results}
+
+@app.post("/api/agents/create")
+async def create_agent(data: dict, user=Depends(get_current_user)):
+    """创建自定义 Agent"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    name = data.get("name")
+    role = data.get("role")
+    model = data.get("model", "gpt-4o-mini")
+    
+    if not name or not role:
+        raise HTTPException(status_code=400, detail="名称和角色不能为空")
+    
+    multi_agent_system.add_agent(Agent(name, role, model))
+    return {"success": True, "agent": {"name": name, "role": role, "model": model}}
+
+# ========== 本地模型支持 (Ollama) ==========
+OLLAMA_BASE_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+
+@app.get("/api/ollama/models")
+async def list_ollama_models():
+    """获取 Ollama 本地模型列表"""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
+            if response.status_code == 200:
+                data = response.json()
+                return {"models": data.get("models", [])}
+    except:
+        pass
+    return {"models": [], "error": "Ollama 未运行或无法连接"}
+
+@app.post("/api/ollama/pull")
+async def pull_ollama_model(data: dict, user=Depends(get_current_user)):
+    """拉取 Ollama 模型"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    model_name = data.get("model", "llama2")
+    
+    try:
+        async with httpx.AsyncClient(timeout=300) as client:
+            response = await client.post(
+                f"{OLLAMA_BASE_URL}/api/pull",
+                json={"name": model_name}
+            )
+            return {"success": response.status_code == 200}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/ollama/chat")
+async def chat_with_ollama(data: dict, user=Depends(get_current_user)):
+    """与 Ollama 本地模型对话"""
+    model = data.get("model", "llama2")
+    messages = data.get("messages", [])
+    
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            response = await client.post(
+                f"{OLLAMA_BASE_URL}/api/chat",
+                json={"model": model, "messages": messages, "stream": False}
+            )
+            if response.status_code == 200:
+                return response.json()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ollama 错误: {str(e)}")
+    
+    raise HTTPException(status_code=500, detail="Ollama 请求失败")
+
+# ========== vLLM 支持 ==========
+VLLM_BASE_URL = os.getenv("VLLM_URL", "http://localhost:8080")
+
+@app.get("/api/vllm/models")
+async def list_vllm_models():
+    """获取 vLLM 模型列表"""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(f"{VLLM_BASE_URL}/v1/models")
+            if response.status_code == 200:
+                return response.json()
+    except:
+        pass
+    return {"data": [], "error": "vLLM 未运行或无法连接"}
+
+@app.post("/api/vllm/chat")
+async def chat_with_vllm(data: dict, user=Depends(get_current_user)):
+    """与 vLLM 模型对话"""
+    model = data.get("model")
+    messages = data.get("messages", [])
+    
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            response = await client.post(
+                f"{VLLM_BASE_URL}/v1/chat/completions",
+                json={"model": model, "messages": messages}
+            )
+            if response.status_code == 200:
+                return response.json()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"vLLM 错误: {str(e)}")
+    
+    raise HTTPException(status_code=500, detail="vLLM 请求失败")
+
 # ========== Function Calling ==========
 import re
 import math

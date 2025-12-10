@@ -238,6 +238,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="nav-item active" data-page="chat"><span class="nav-item-icon">💬</span> 对话</div>
 <div class="nav-item" data-page="assistants"><span class="nav-item-icon">🎭</span> 助手</div>
 <div class="nav-item" data-page="providers"><span class="nav-item-icon">📦</span> 模型服务</div>
+<div class="nav-item" data-page="local-models"><span class="nav-item-icon">🏠</span> 本地模型</div>
 <div class="nav-item" data-page="default-model"><span class="nav-item-icon">🎯</span> 默认模型</div>
 <div class="nav-item" data-page="compare"><span class="nav-item-icon">⚖️</span> 模型对比</div>
 </div>
@@ -386,6 +387,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="settings-section"><h4><span>📋</span> 模型列表</h4><div style="margin-bottom:12px"><button class="btn btn-ghost btn-sm" onclick="addModel()">+ 添加</button><button class="btn btn-ghost btn-sm" onclick="fetchModels()">🔄 获取</button></div><div id="modelList"></div></div>
 </div></div></div>
 </div>
+<!-- 本地模型页 -->
+<div id="page-local-models" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>🏠</span> 本地模型 (Ollama)</h4>
+<p style="color:var(--text2);margin-bottom:16px">使用 Ollama 运行本地大语言模型，数据完全私有</p>
+<div style="display:flex;gap:12px;margin-bottom:20px">
+<button class="btn btn-primary" onclick="loadOllamaModels()">🔄 刷新模型</button>
+<button class="btn btn-ghost" onclick="showPullModelModal()">📥 拉取模型</button>
+<a href="https://ollama.ai" target="_blank" class="btn btn-ghost">📖 Ollama 官网</a>
+</div>
+<div id="ollamaStatus" style="padding:12px;background:var(--bg);border-radius:8px;margin-bottom:16px"></div>
+<div id="ollamaModelList"></div>
+</div>
+<div class="settings-section">
+<h4><span>💬</span> 本地模型对话</h4>
+<div class="form-group"><label>选择模型</label><select id="ollamaModelSelect" style="width:100%;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text)"></select></div>
+<div class="form-group"><label>消息</label><textarea id="ollamaMessage" rows="4" placeholder="输入消息..."></textarea></div>
+<button class="btn btn-primary" onclick="chatWithOllama()">发送</button>
+<div id="ollamaResponse" style="margin-top:16px;padding:16px;background:var(--bg);border-radius:8px;min-height:100px;display:none"></div>
+</div>
+<div class="settings-section">
+<h4><span>⚡</span> vLLM 服务</h4>
+<p style="color:var(--text2);margin-bottom:16px">高性能推理服务器</p>
+<div class="form-group"><label>vLLM 地址</label><input type="text" id="vllmUrl" value="http://localhost:8080" placeholder="http://localhost:8080"></div>
+<button class="btn btn-ghost" onclick="loadVLLMModels()">检查连接</button>
+<div id="vllmStatus" style="margin-top:12px"></div>
+</div>
+</div></div></div></div>
 <!-- 默认模型页 -->
 <div id="page-default-model" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
 <div class="settings-section">
@@ -1013,6 +1042,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <p style="color:var(--text2);margin-bottom:20px">创建多步骤自动化任务，让 AI 按流程完成复杂工作</p>
 <div id="workflowTemplates" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px"></div>
 </div>
+<div class="settings-section">
+<h4><span>👥</span> 多 Agent 协作</h4>
+<p style="color:var(--text2);margin-bottom:16px">多个 AI Agent 协同完成复杂任务</p>
+<div class="form-group"><label>任务描述</label><textarea id="multiAgentTask" rows="3" placeholder="描述你需要完成的任务..."></textarea></div>
+<div class="form-group"><label>选择 Agent</label>
+<div id="agentCheckboxes" style="display:flex;flex-wrap:wrap;gap:12px"></div>
+</div>
+<div class="form-group"><label>协作模式</label>
+<select id="agentMode" style="width:200px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text)">
+<option value="sequential">顺序执行</option>
+<option value="parallel">并行执行</option>
+<option value="debate">辩论模式</option>
+</select>
+</div>
+<button class="btn btn-primary" onclick="runMultiAgent()">🚀 开始协作</button>
+<button class="btn btn-ghost" onclick="showCreateAgentModal()" style="margin-left:8px">+ 创建 Agent</button>
+</div>
+<div class="settings-section" id="multiAgentResults" style="display:none">
+<h4><span>📋</span> 协作结果</h4>
+<div id="multiAgentResultsContent"></div>
+</div>
 <div class="settings-section" id="workflowRunner" style="display:none">
 <h4><span>▶️</span> 运行工作流</h4>
 <div id="workflowInputs"></div>
@@ -1351,7 +1401,7 @@ function showModal(id){$(id).classList.add('show')}
 function setAccent(c){document.documentElement.style.setProperty('--accent',c)}
 function toggleCollapse(el){var content=el.nextElementSibling;content.classList.toggle('show');el.querySelector('span:last-child').textContent=content.classList.contains('show')?'▲':'▼'}
 function api(path,options){options=options||{};var headers=Object.assign({'Content-Type':'application/json'},options.headers||{});if(authToken)headers['Authorization']='Bearer '+authToken;return fetch(path,Object.assign({},options,{headers:headers})).then(function(res){if(!res.ok)return res.json().then(function(e){throw new Error(e.detail||'Error')});return res.json()})}
-document.querySelectorAll('.nav-item[data-page]').forEach(function(n){n.onclick=function(){document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});n.classList.add('active');var page=$('page-'+n.dataset.page);if(page)page.classList.add('active');if(n.dataset.page==='stats')loadStats();if(n.dataset.page==='tokens')loadTokens();if(n.dataset.page==='teams')loadTeams();if(n.dataset.page==='knowledge')loadKnowledgeBases();if(n.dataset.page==='workflows')loadWorkflowTemplates();if(n.dataset.page==='traces')loadTraces();if(n.dataset.page==='integrations')loadFeatureFlags();if(n.dataset.page==='rag')loadRAGKnowledgeBases();if(n.dataset.page==='billing'){loadBillingPlans();loadSubscription();loadUsageStats();loadInvoices()}if(n.dataset.page==='rbac'){loadMyPermissions();loadRoles()}closeMobileMenus()}});
+document.querySelectorAll('.nav-item[data-page]').forEach(function(n){n.onclick=function(){document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});n.classList.add('active');var page=$('page-'+n.dataset.page);if(page)page.classList.add('active');if(n.dataset.page==='stats')loadStats();if(n.dataset.page==='tokens')loadTokens();if(n.dataset.page==='teams')loadTeams();if(n.dataset.page==='knowledge')loadKnowledgeBases();if(n.dataset.page==='workflows')loadWorkflowTemplates();if(n.dataset.page==='traces')loadTraces();if(n.dataset.page==='integrations')loadFeatureFlags();if(n.dataset.page==='rag')loadRAGKnowledgeBases();if(n.dataset.page==='billing'){loadBillingPlans();loadSubscription();loadUsageStats();loadInvoices()}if(n.dataset.page==='rbac'){loadMyPermissions();loadRoles()}if(n.dataset.page==='local-models')loadOllamaModels();if(n.dataset.page==='workflows')loadAgents();closeMobileMenus()}});
 function showAuthModal(){isRegisterMode=false;updateAuthUI();showModal('authModal')}
 function toggleAuthMode(){isRegisterMode=!isRegisterMode;updateAuthUI()}
 function updateAuthUI(){$('authTitle').textContent=isRegisterMode?'注册':'登录';$('authSubmit').textContent=isRegisterMode?'注册':'登录';$('authEmailGroup').style.display=isRegisterMode?'block':'none';$('authSwitch').innerHTML=isRegisterMode?'已有账号？<a href="#" onclick="toggleAuthMode()" style="color:var(--accent)">登录</a>':'没有账号？<a href="#" onclick="toggleAuthMode()" style="color:var(--accent)">注册</a>'}
@@ -1932,6 +1982,103 @@ a.click();
 showToast('追踪数据已导出')
 }).catch(function(e){alert('导出失败: '+e.message)})
 }).catch(function(e){alert('获取追踪失败: '+e.message)})}
+
+// ========== 多 Agent 协作 ==========
+function loadAgents(){
+api('/api/agents').then(function(data){
+var html=data.map(function(a){
+return'<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:8px;cursor:pointer"><input type="checkbox" class="agent-checkbox" value="'+a.name+'" checked><span>'+a.name+'</span><span style="font-size:11px;color:var(--text2)">'+a.role+'</span></label>'
+}).join('');
+$('agentCheckboxes').innerHTML=html
+}).catch(function(){})}
+
+function runMultiAgent(){
+var task=$('multiAgentTask').value.trim();
+if(!task){alert('请输入任务描述');return}
+var agents=[];
+document.querySelectorAll('.agent-checkbox:checked').forEach(function(cb){agents.push(cb.value)});
+if(agents.length<2){alert('请至少选择2个Agent');return}
+var mode=$('agentMode').value;
+$('multiAgentResults').style.display='block';
+$('multiAgentResultsContent').innerHTML='<p style="color:var(--text2)">Agent 正在协作中...</p>';
+api('/api/agents/collaborate',{method:'POST',body:JSON.stringify({task:task,agents:agents,mode:mode})}).then(function(data){
+var html='<div style="font-size:12px;color:var(--text2);margin-bottom:16px">模式: '+data.mode+'</div>';
+for(var name in data.results){
+html+='<div style="padding:16px;background:var(--bg);border-radius:10px;margin-bottom:12px;border-left:4px solid var(--accent)"><div style="font-weight:500;margin-bottom:8px">'+name+'</div><div style="font-size:14px;line-height:1.6">'+marked.parse(data.results[name])+'</div></div>'
+}
+$('multiAgentResultsContent').innerHTML=html
+}).catch(function(e){$('multiAgentResultsContent').innerHTML='<p style="color:var(--error)">执行失败: '+e.message+'</p>'})}
+
+function showCreateAgentModal(){
+var html='<div class="form-group"><label>Agent 名称</label><input type="text" id="newAgentName" placeholder="分析师"></div><div class="form-group"><label>角色描述</label><input type="text" id="newAgentRole" placeholder="数据分析专家"></div><div class="form-group"><label>使用模型</label><input type="text" id="newAgentModel" value="gpt-4o-mini"></div><div style="display:flex;gap:12px"><button class="btn btn-primary" onclick="createAgent()">创建</button><button class="btn btn-ghost" onclick="closeModal(\'agentModal\')">取消</button></div>';
+showCustomModal('创建 Agent',html,'agentModal')}
+
+function createAgent(){
+var name=$('newAgentName').value.trim();
+var role=$('newAgentRole').value.trim();
+var model=$('newAgentModel').value.trim()||'gpt-4o-mini';
+if(!name||!role){alert('请填写名称和角色');return}
+api('/api/agents/create',{method:'POST',body:JSON.stringify({name:name,role:role,model:model})}).then(function(){
+closeModal('agentModal');
+loadAgents();
+showToast('Agent 已创建')
+}).catch(function(e){alert('创建失败: '+e.message)})}
+
+// ========== 本地模型 (Ollama) ==========
+function loadOllamaModels(){
+$('ollamaStatus').innerHTML='<span style="color:var(--text2)">检查 Ollama 连接...</span>';
+api('/api/ollama/models').then(function(data){
+if(data.error){
+$('ollamaStatus').innerHTML='<span style="color:var(--error)">❌ '+data.error+'</span>';
+$('ollamaModelList').innerHTML='';
+$('ollamaModelSelect').innerHTML='<option>无可用模型</option>';
+return}
+$('ollamaStatus').innerHTML='<span style="color:var(--success)">✅ Ollama 已连接，共 '+data.models.length+' 个模型</span>';
+var html=data.models.map(function(m){
+var size=(m.size/1024/1024/1024).toFixed(1);
+return'<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px"><div><strong>'+m.name+'</strong><div style="font-size:12px;color:var(--text2)">'+size+' GB</div></div><button class="btn btn-ghost btn-sm" onclick="selectOllamaModel(\''+m.name+'\')">使用</button></div>'
+}).join('');
+$('ollamaModelList').innerHTML=html||'<p style="color:var(--text2)">暂无模型，请先拉取</p>';
+var selectHtml=data.models.map(function(m){return'<option value="'+m.name+'">'+m.name+'</option>'}).join('');
+$('ollamaModelSelect').innerHTML=selectHtml||'<option>无可用模型</option>'
+}).catch(function(e){$('ollamaStatus').innerHTML='<span style="color:var(--error)">❌ 连接失败</span>'})}
+
+function showPullModelModal(){
+var html='<div class="form-group"><label>模型名称</label><input type="text" id="pullModelName" placeholder="llama2, mistral, codellama..."></div><p style="font-size:12px;color:var(--text2);margin-bottom:16px">常用模型: llama2, mistral, codellama, phi, gemma</p><div style="display:flex;gap:12px"><button class="btn btn-primary" onclick="pullOllamaModel()">拉取</button><button class="btn btn-ghost" onclick="closeModal(\'pullModal\')">取消</button></div>';
+showCustomModal('拉取 Ollama 模型',html,'pullModal')}
+
+function pullOllamaModel(){
+var model=$('pullModelName').value.trim();
+if(!model){alert('请输入模型名称');return}
+showToast('开始拉取 '+model+'，请稍候...');
+closeModal('pullModal');
+api('/api/ollama/pull',{method:'POST',body:JSON.stringify({model:model})}).then(function(data){
+if(data.success){showToast('模型拉取成功！');loadOllamaModels()}else{alert('拉取失败')}
+}).catch(function(e){alert('拉取失败: '+e.message)})}
+
+function selectOllamaModel(name){$('ollamaModelSelect').value=name;showToast('已选择 '+name)}
+
+function chatWithOllama(){
+var model=$('ollamaModelSelect').value;
+var message=$('ollamaMessage').value.trim();
+if(!model||!message){alert('请选择模型并输入消息');return}
+$('ollamaResponse').style.display='block';
+$('ollamaResponse').innerHTML='<p style="color:var(--text2)">思考中...</p>';
+api('/api/ollama/chat',{method:'POST',body:JSON.stringify({model:model,messages:[{role:'user',content:message}]})}).then(function(data){
+var content=data.message?data.message.content:'无响应';
+$('ollamaResponse').innerHTML=marked.parse(content)
+}).catch(function(e){$('ollamaResponse').innerHTML='<p style="color:var(--error)">错误: '+e.message+'</p>'})}
+
+function loadVLLMModels(){
+var url=$('vllmUrl').value.trim();
+$('vllmStatus').innerHTML='<span style="color:var(--text2)">检查连接...</span>';
+fetch(url+'/v1/models').then(function(r){return r.json()}).then(function(data){
+if(data.data&&data.data.length>0){
+$('vllmStatus').innerHTML='<span style="color:var(--success)">✅ vLLM 已连接，模型: '+data.data.map(function(m){return m.id}).join(', ')+'</span>'
+}else{
+$('vllmStatus').innerHTML='<span style="color:var(--warning)">⚠️ 已连接但无模型</span>'
+}
+}).catch(function(){$('vllmStatus').innerHTML='<span style="color:var(--error)">❌ 无法连接到 vLLM</span>'})}
 
 // ========== RAG 检索 ==========
 function loadRAGKnowledgeBases(){
