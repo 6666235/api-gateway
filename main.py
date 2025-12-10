@@ -2776,6 +2776,250 @@ async def update_locale(data: dict, user=Depends(get_current_user)):
         conn.execute("UPDATE users SET locale = ? WHERE id = ?", (locale, user["id"]))
     return {"success": True}
 
+# ========== 智能推荐 ==========
+@app.get("/api/recommendations")
+async def get_recommendations(user=Depends(get_current_user)):
+    """基于使用习惯的智能推荐"""
+    if not user:
+        return {"prompts": [], "models": [], "features": []}
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        
+        # 最常用的模型
+        top_models = conn.execute("""
+            SELECT provider, model, COUNT(*) as cnt 
+            FROM api_logs WHERE user_id = ? 
+            GROUP BY provider, model 
+            ORDER BY cnt DESC LIMIT 3
+        """, (user["id"],)).fetchall()
+        
+        # 最常用的 Prompt 模板
+        top_prompts = conn.execute("""
+            SELECT * FROM prompt_templates 
+            WHERE user_id = ? OR is_public = 1 
+            ORDER BY use_count DESC LIMIT 5
+        """, (user["id"],)).fetchall()
+        
+        # 推荐功能
+        features = []
+        
+        # 检查是否使用过知识库
+        kb_count = conn.execute(
+            "SELECT COUNT(*) FROM knowledge_bases WHERE user_id = ?", (user["id"],)
+        ).fetchone()[0]
+        if kb_count == 0:
+            features.append({"name": "知识库", "desc": "上传文档，让 AI 基于您的资料回答", "icon": "📚"})
+        
+        # 检查是否使用过团队功能
+        team_count = conn.execute(
+            "SELECT COUNT(*) FROM team_members WHERE user_id = ?", (user["id"],)
+        ).fetchone()[0]
+        if team_count == 0:
+            features.append({"name": "团队协作", "desc": "邀请团队成员一起使用", "icon": "👥"})
+        
+        return {
+            "models": [dict(m) for m in top_models],
+            "prompts": [dict(p) for p in top_prompts],
+            "features": features
+        }
+
+# ========== 使用分析 ==========
+@app.get("/api/analytics/usage")
+async def get_usage_analytics(days: int = 30, user=Depends(get_current_user)):
+    """获取详细使用分析"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        
+        # 每日使用趋势
+        daily_usage = conn.execute("""
+            SELECT date(created_at) as day, 
+                   COUNT(*) as calls,
+                   SUM(tokens_input) as input_tokens,
+                   SUM(tokens_output) as output_tokens,
+                   AVG(latency_ms) as avg_latency
+            FROM api_logs 
+            WHERE user_id = ? AND created_at >= date('now', ?)
+            GROUP BY date(created_at)
+            ORDER BY day
+        """, (user["id"], f'-{days} days')).fetchall()
+        
+        # 按小时分布
+        hourly_dist = conn.execute("""
+            SELECT strftime('%H', created_at) as hour, COUNT(*) as cnt
+            FROM api_logs 
+            WHERE user_id = ? AND created_at >= date('now', '-7 days')
+            GROUP BY hour
+            ORDER BY hour
+        """, (user["id"],)).fetchall()
+        
+        # 错误率
+        error_stats = conn.execute("""
+            SELECT status, COUNT(*) as cnt
+            FROM api_logs 
+            WHERE user_id = ? AND created_at >= date('now', ?)
+            GROUP BY status
+        """, (user["id"], f'-{days} days')).fetchall()
+        
+        total = sum(e["cnt"] for e in error_stats)
+        errors = sum(e["cnt"] for e in error_stats if e["status"] != "success")
+        error_rate = (errors / total * 100) if total > 0 else 0
+        
+        return {
+            "daily_usage": [dict(d) for d in daily_usage],
+            "hourly_distribution": [dict(h) for h in hourly_dist],
+            "error_rate": round(error_rate, 2),
+            "total_calls": total
+        }
+
+# ========== 导入导出 ==========
+@app.post("/api/data/export-all")
+async def export_all_data(user=Depends(get_current_user)):
+    """导出用户所有数据"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        
+        data = {
+            "user": {k: v for k, v in dict(user).items() if k not in ["password_hash", "totp_secret"]},
+            "conversations": [],
+            "notes": [],
+            "memories": [],
+            "shortcuts": [],
+            "settings": {}
+        }
+        
+        # 对话
+        convs = conn.execute(
+            "SELECT * FROM conversations WHERE user_id = ?", (user["id"],)
+        ).fetchall()
+        for conv in convs:
+            msgs = conn.execute(
+                "SELECT role, content, created_at FROM messages WHERE conversation_id = ?",
+                (conv["id"],)
+            ).fetchall()
+            data["conversations"].append({
+                **dict(conv),
+                "messages": [dict(m) for m in msgs]
+            })
+        
+        # 笔记
+        notes = conn.execute(
+            "SELECT * FROM notes WHERE user_id = ?", (user["id"],)
+        ).fetchall()
+        data["notes"] = [dict(n) for n in notes]
+        
+        # 记忆
+        memories = conn.execute(
+            "SELECT * FROM memories WHERE user_id = ?", (user["id"],)
+        ).fetchall()
+        data["memories"] = [dict(m) for m in memories]
+        
+        # 快捷短语
+        shortcuts = conn.execute(
+            "SELECT * FROM shortcuts WHERE user_id = ?", (user["id"],)
+        ).fetchall()
+        data["shortcuts"] = [dict(s) for s in shortcuts]
+        
+        # 设置
+        settings = conn.execute(
+            "SELECT data FROM settings WHERE user_id = ?", (user["id"],)
+        ).fetchone()
+        if settings:
+            data["settings"] = json.loads(settings["data"])
+        
+        return data
+
+@app.post("/api/data/import")
+async def import_data(data: dict, user=Depends(get_current_user)):
+    """导入用户数据"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    imported = {"conversations": 0, "notes": 0, "memories": 0, "shortcuts": 0}
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        # 导入对话
+        for conv in data.get("conversations", []):
+            conv_id = f"conv_{secrets.token_hex(8)}"
+            conn.execute(
+                "INSERT INTO conversations (id, user_id, title, provider, model) VALUES (?, ?, ?, ?, ?)",
+                (conv_id, user["id"], conv.get("title", "导入的对话"), conv.get("provider"), conv.get("model"))
+            )
+            for msg in conv.get("messages", []):
+                conn.execute(
+                    "INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)",
+                    (conv_id, msg.get("role"), msg.get("content"))
+                )
+            imported["conversations"] += 1
+        
+        # 导入笔记
+        for note in data.get("notes", []):
+            note_id = f"note_{secrets.token_hex(8)}"
+            conn.execute(
+                "INSERT INTO notes (id, user_id, title, content, tags) VALUES (?, ?, ?, ?, ?)",
+                (note_id, user["id"], note.get("title"), note.get("content"), note.get("tags", ""))
+            )
+            imported["notes"] += 1
+        
+        # 导入记忆
+        for mem in data.get("memories", []):
+            conn.execute(
+                "INSERT INTO memories (user_id, content, category) VALUES (?, ?, ?)",
+                (user["id"], mem.get("content"), mem.get("category", "general"))
+            )
+            imported["memories"] += 1
+        
+        # 导入快捷短语
+        for sc in data.get("shortcuts", []):
+            conn.execute(
+                "INSERT INTO shortcuts (user_id, name, content, hotkey) VALUES (?, ?, ?, ?)",
+                (user["id"], sc.get("name"), sc.get("content"), sc.get("hotkey", ""))
+            )
+            imported["shortcuts"] += 1
+    
+    return {"success": True, "imported": imported}
+
+# ========== 收藏功能 ==========
+@app.post("/api/messages/favorite")
+async def favorite_message(data: dict, user=Depends(get_current_user)):
+    """收藏消息"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    conv_id = data.get("conversation_id")
+    message_index = data.get("message_index")
+    content = data.get("content")
+    
+    # 保存为记忆
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO memories (user_id, content, category) VALUES (?, ?, ?)",
+            (user["id"], f"[收藏] {content[:500]}", "favorite")
+        )
+    
+    return {"success": True}
+
+# ========== 快速回复 ==========
+QUICK_REPLIES = [
+    {"id": "continue", "text": "继续", "prompt": "请继续"},
+    {"id": "explain", "text": "解释", "prompt": "请详细解释一下"},
+    {"id": "example", "text": "举例", "prompt": "请举个例子"},
+    {"id": "simplify", "text": "简化", "prompt": "请用更简单的语言解释"},
+    {"id": "code", "text": "代码", "prompt": "请给出代码示例"},
+    {"id": "summary", "text": "总结", "prompt": "请总结一下要点"},
+]
+
+@app.get("/api/quick-replies")
+async def get_quick_replies():
+    """获取快速回复选项"""
+    return QUICK_REPLIES
+
 # ========== 静态文件 ==========
 import pathlib
 BASE_DIR = pathlib.Path(__file__).parent.resolve()

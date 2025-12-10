@@ -308,6 +308,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 <div class="chat-messages" id="chatMessages"><div class="empty-state"><span>💬</span><p>开始新的对话</p><p style="font-size:12px;margin-top:8px;color:var(--text2)">Ctrl+N 新建对话 · Enter 发送消息</p></div></div>
 <div class="chat-input-area">
+<div id="quickReplies" style="display:none;padding:8px 0;margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap"></div>
 <div id="imagePreview" style="display:none;padding:8px 0;margin-bottom:8px"></div>
 <div class="chat-toolbar">
 <button class="btn btn-ghost btn-sm" onclick="uploadImage()" title="上传图片">🖼️</button>
@@ -521,7 +522,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="content"><div class="content-body"><div class="settings-panel">
 <div class="settings-section">
 <h4><span>💾</span> 数据设置</h4>
-<div class="setting-row"><div class="setting-row-label">数据备份与恢复</div><div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="exportAllData()">备份</button><button class="btn btn-ghost" onclick="importData()">恢复</button></div></div>
+<div class="setting-row"><div class="setting-row-label">数据备份与恢复<br><small style="color:var(--text2)">导出/导入所有数据（对话、笔记、记忆、设置）</small></div><div style="display:flex;gap:8px"><button class="btn btn-primary" onclick="exportAllData()">📤 导出全部</button><button class="btn btn-ghost" onclick="importAllData()">📥 导入数据</button></div></div>
+<div class="setting-row"><div class="setting-row-label">数据库优化<br><small style="color:var(--text2)">清理过期数据，优化数据库性能</small></div><button class="btn btn-ghost" onclick="optimizeDatabase()">🔧 优化数据库</button></div>
 <div class="setting-row"><div class="setting-row-label">简易备份<br><small style="color:var(--text2)">备份包括已备份的数据，如对话记录/模型人工上架和配置，减少空间占用，快速备份恢复</small></div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
 <div class="setting-row"><div class="setting-row-label">导出至手机</div><button class="btn btn-ghost btn-sm">📱 局域网传输</button></div>
 </div>
@@ -580,7 +582,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div style="font-size:12px;color:var(--text2);margin-top:4px">输出 Tokens</div>
 </div>
 </div>
+<div style="display:flex;gap:12px">
 <button class="btn btn-ghost" onclick="loadStats()">🔄 刷新统计</button>
+<button class="btn btn-primary" onclick="showUsageAnalytics()">📈 详细分析</button>
+</div>
 </div>
 <div class="settings-section">
 <h4><span>📈</span> 7天使用趋势</h4>
@@ -1555,6 +1560,110 @@ $('chatInput').addEventListener('input',function(){clearTimeout(draftTimer);draf
 
 // ========== 消息搜索增强 ==========
 function searchInCurrentChat(){var q=prompt('在当前对话中搜索:');if(!q)return;var chat=chats.find(function(c){return c.id===currentChatId});if(!chat||!chat.messages)return;var results=chat.messages.filter(function(m){return m.content&&m.content.toLowerCase().includes(q.toLowerCase())});if(results.length===0){alert('未找到匹配消息');return}var html='<div style="max-height:400px;overflow-y:auto">';results.forEach(function(m,i){html+='<div style="padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px"><div style="font-size:12px;color:var(--text2);margin-bottom:4px">'+(m.role==='user'?'👤 用户':'🤖 助手')+'</div><div style="font-size:14px">'+m.content.slice(0,200)+(m.content.length>200?'...':'')+'</div></div>'});html+='</div>';showCustomModal('搜索结果 ('+results.length+')',html,'searchResultModal')}
+
+// ========== 快速回复 ==========
+var quickReplies=[
+{id:'continue',text:'继续',prompt:'请继续'},
+{id:'explain',text:'解释',prompt:'请详细解释一下'},
+{id:'example',text:'举例',prompt:'请举个例子'},
+{id:'simplify',text:'简化',prompt:'请用更简单的语言解释'},
+{id:'code',text:'代码',prompt:'请给出代码示例'},
+{id:'summary',text:'总结',prompt:'请总结一下要点'}
+];
+function showQuickReplies(){
+var chat=chats.find(function(c){return c.id===currentChatId});
+if(!chat||!chat.messages||chat.messages.length===0){$('quickReplies').style.display='none';return}
+var lastMsg=chat.messages[chat.messages.length-1];
+if(lastMsg.role!=='assistant'){$('quickReplies').style.display='none';return}
+var html=quickReplies.map(function(r){return'<button class="btn btn-ghost btn-sm" onclick="sendQuickReply(\''+r.prompt+'\')">'+r.text+'</button>'}).join('');
+$('quickReplies').innerHTML=html;
+$('quickReplies').style.display='flex'}
+function sendQuickReply(prompt){$('chatInput').value=prompt;sendMessage()}
+
+// ========== 数据导入导出 ==========
+function exportAllData(){
+if(!authToken){alert('请先登录');return}
+showToast('正在导出数据...');
+api('/api/data/export-all',{method:'POST'}).then(function(data){
+var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+var a=document.createElement('a');
+a.href=URL.createObjectURL(blob);
+a.download='ai_hub_backup_'+new Date().toISOString().slice(0,10)+'.json';
+a.click();
+showToast('数据已导出')
+}).catch(function(e){alert('导出失败: '+e.message)})}
+
+function importAllData(){
+if(!authToken){alert('请先登录');return}
+var input=document.createElement('input');
+input.type='file';
+input.accept='.json';
+input.onchange=function(e){
+var file=e.target.files[0];
+if(!file)return;
+var reader=new FileReader();
+reader.onload=function(ev){
+try{
+var data=JSON.parse(ev.target.result);
+if(!confirm('确定要导入数据？这将添加 '+
+(data.conversations?data.conversations.length:0)+' 个对话、'+
+(data.notes?data.notes.length:0)+' 个笔记'))return;
+api('/api/data/import',{method:'POST',body:JSON.stringify(data)}).then(function(result){
+showToast('导入完成: '+result.imported.conversations+' 对话, '+result.imported.notes+' 笔记');
+loadChats()
+}).catch(function(e){alert('导入失败: '+e.message)})
+}catch(e){alert('文件格式错误')}};
+reader.readAsText(file)};
+input.click()}
+
+// ========== 智能推荐 ==========
+function loadRecommendations(){
+api('/api/recommendations').then(function(data){
+if(data.features&&data.features.length>0){
+var html='<div style="padding:16px;background:var(--bg3);border-radius:10px;margin-bottom:16px"><div style="font-size:13px;color:var(--text2);margin-bottom:12px">💡 推荐功能</div><div style="display:flex;gap:12px;flex-wrap:wrap">';
+data.features.forEach(function(f){
+html+='<div style="padding:12px;background:var(--bg);border-radius:8px;cursor:pointer;flex:1;min-width:150px" onclick="showFeatureGuide(\''+f.name+'\')"><span style="font-size:20px">'+f.icon+'</span><div style="font-size:14px;font-weight:500;margin-top:8px">'+f.name+'</div><div style="font-size:12px;color:var(--text2);margin-top:4px">'+f.desc+'</div></div>'});
+html+='</div></div>';
+var container=$('chatMessages');
+if(container&&container.querySelector('.empty-state')){
+container.innerHTML=html+container.innerHTML}}
+}).catch(function(){})}
+function showFeatureGuide(name){
+var guides={
+'知识库':'点击左侧导航的"知识库"，创建知识库并上传文档，AI 将基于您的资料回答问题。',
+'团队协作':'点击左侧导航的"团队空间"，创建团队并邀请成员，共享对话和资源。'
+};
+alert(guides[name]||'功能介绍开发中')}
+
+// ========== 收藏消息 ==========
+function favoriteMessage(content){
+if(!authToken){alert('请先登录');return}
+api('/api/messages/favorite',{method:'POST',body:JSON.stringify({
+conversation_id:currentChatId,
+content:content
+})}).then(function(){showToast('已收藏到记忆')}).catch(function(e){alert('收藏失败: '+e.message)})}
+
+// ========== 使用分析 ==========
+function showUsageAnalytics(){
+api('/api/analytics/usage?days=30').then(function(data){
+var html='<div style="margin-bottom:20px"><h4 style="margin-bottom:12px">📊 30天使用趋势</h4>';
+if(data.daily_usage.length>0){
+var maxCalls=Math.max.apply(null,data.daily_usage.map(function(d){return d.calls}));
+html+='<div style="display:flex;align-items:flex-end;gap:4px;height:100px">';
+data.daily_usage.forEach(function(d){
+var height=Math.max(5,(d.calls/maxCalls)*100);
+html+='<div style="flex:1;background:var(--accent);border-radius:2px 2px 0 0;height:'+height+'px" title="'+d.day+': '+d.calls+'次"></div>'});
+html+='</div>'}
+html+='</div>';
+html+='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px">';
+html+='<div style="background:var(--bg);padding:16px;border-radius:10px"><div style="font-size:12px;color:var(--text2)">总调用次数</div><div style="font-size:24px;font-weight:600">'+data.total_calls+'</div></div>';
+html+='<div style="background:var(--bg);padding:16px;border-radius:10px"><div style="font-size:12px;color:var(--text2)">错误率</div><div style="font-size:24px;font-weight:600;color:'+(data.error_rate>5?'var(--error)':'var(--success)')+'">'+data.error_rate+'%</div></div>';
+html+='</div>';
+showCustomModal('📈 使用分析',html,'analyticsModal')
+}).catch(function(e){alert('获取分析失败: '+e.message)})}
+
+// 初始化时加载推荐
+setTimeout(loadRecommendations,1000);
 
 console.log('🤖 AI Hub v2.0.0 - Enhanced');
 </script>
