@@ -406,6 +406,158 @@ def init_db():
 
 init_db()
 
+# ========== 扩展数据库表 ==========
+def init_extended_db():
+    """初始化扩展功能的数据库表"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.executescript('''
+            -- RBAC 权限系统
+            CREATE TABLE IF NOT EXISTS roles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                description TEXT,
+                permissions TEXT DEFAULT '[]',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            CREATE TABLE IF NOT EXISTS user_roles (
+                user_id INTEGER,
+                role_id INTEGER,
+                PRIMARY KEY (user_id, role_id),
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (role_id) REFERENCES roles(id)
+            );
+            
+            -- 向量存储（RAG）
+            CREATE TABLE IF NOT EXISTS vector_documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kb_id INTEGER,
+                chunk_id TEXT,
+                content TEXT,
+                embedding BLOB,
+                metadata TEXT DEFAULT '{}',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (kb_id) REFERENCES knowledge_bases(id)
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_vector_kb ON vector_documents(kb_id);
+            
+            -- 计费系统
+            CREATE TABLE IF NOT EXISTS billing_plans (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                price REAL,
+                tokens_limit INTEGER,
+                features TEXT DEFAULT '[]',
+                is_active INTEGER DEFAULT 1
+            );
+            
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                plan_id TEXT,
+                status TEXT DEFAULT 'active',
+                start_date TIMESTAMP,
+                end_date TIMESTAMP,
+                auto_renew INTEGER DEFAULT 1,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (plan_id) REFERENCES billing_plans(id)
+            );
+            
+            CREATE TABLE IF NOT EXISTS invoices (
+                id TEXT PRIMARY KEY,
+                user_id INTEGER,
+                subscription_id INTEGER,
+                amount REAL,
+                status TEXT DEFAULT 'pending',
+                paid_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+            
+            CREATE TABLE IF NOT EXISTS usage_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                type TEXT,
+                amount INTEGER,
+                unit_price REAL,
+                total_cost REAL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+            
+            -- 实时协作
+            CREATE TABLE IF NOT EXISTS collaboration_sessions (
+                id TEXT PRIMARY KEY,
+                conversation_id TEXT,
+                created_by INTEGER,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+            );
+            
+            CREATE TABLE IF NOT EXISTS collaboration_participants (
+                session_id TEXT,
+                user_id INTEGER,
+                role TEXT DEFAULT 'viewer',
+                joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (session_id, user_id),
+                FOREIGN KEY (session_id) REFERENCES collaboration_sessions(id)
+            );
+            
+            -- 插件系统
+            CREATE TABLE IF NOT EXISTS plugins (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                version TEXT,
+                author TEXT,
+                config TEXT DEFAULT '{}',
+                is_enabled INTEGER DEFAULT 0,
+                installed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            CREATE TABLE IF NOT EXISTS user_plugins (
+                user_id INTEGER,
+                plugin_id TEXT,
+                config TEXT DEFAULT '{}',
+                enabled INTEGER DEFAULT 1,
+                PRIMARY KEY (user_id, plugin_id),
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (plugin_id) REFERENCES plugins(id)
+            );
+        ''')
+        
+        # 初始化默认角色
+        default_roles = [
+            ('admin', '管理员', '["*"]'),
+            ('user', '普通用户', '["chat", "notes", "memory"]'),
+            ('vip', 'VIP用户', '["chat", "notes", "memory", "image", "code", "rag"]'),
+            ('guest', '访客', '["chat"]'),
+        ]
+        for name, desc, perms in default_roles:
+            conn.execute(
+                "INSERT OR IGNORE INTO roles (name, description, permissions) VALUES (?, ?, ?)",
+                (name, desc, perms)
+            )
+        
+        # 初始化计费套餐
+        default_plans = [
+            ('free', '免费版', 0, 10000, '["chat", "notes"]'),
+            ('basic', '基础版', 19.9, 100000, '["chat", "notes", "memory", "shortcuts"]'),
+            ('pro', '专业版', 49.9, 500000, '["chat", "notes", "memory", "shortcuts", "image", "code", "rag"]'),
+            ('enterprise', '企业版', 199.9, -1, '["*"]'),
+        ]
+        for pid, name, price, tokens, features in default_plans:
+            conn.execute(
+                "INSERT OR IGNORE INTO billing_plans (id, name, price, tokens_limit, features) VALUES (?, ?, ?, ?, ?)",
+                (pid, name, price, tokens, features)
+            )
+        
+        logger.info("Extended database tables initialized")
+
+init_extended_db()
+
 # 密码哈希
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
@@ -3464,6 +3616,608 @@ QUICK_REPLIES = [
 async def get_quick_replies():
     """获取快速回复选项"""
     return QUICK_REPLIES
+
+# ========== RAG 向量检索 ==========
+import numpy as np
+from typing import Tuple
+
+class SimpleVectorStore:
+    """简单的向量存储（生产环境建议使用 Pinecone/Milvus）"""
+    
+    def __init__(self):
+        self.vectors = {}  # kb_id -> [(chunk_id, embedding, content)]
+    
+    def add(self, kb_id: int, chunk_id: str, embedding: list, content: str):
+        if kb_id not in self.vectors:
+            self.vectors[kb_id] = []
+        self.vectors[kb_id].append((chunk_id, np.array(embedding), content))
+    
+    def search(self, kb_id: int, query_embedding: list, top_k: int = 5) -> list:
+        if kb_id not in self.vectors:
+            return []
+        
+        query_vec = np.array(query_embedding)
+        results = []
+        
+        for chunk_id, vec, content in self.vectors[kb_id]:
+            # 余弦相似度
+            similarity = np.dot(query_vec, vec) / (np.linalg.norm(query_vec) * np.linalg.norm(vec) + 1e-8)
+            results.append((chunk_id, float(similarity), content))
+        
+        results.sort(key=lambda x: x[1], reverse=True)
+        return results[:top_k]
+    
+    def delete(self, kb_id: int, chunk_id: str = None):
+        if chunk_id:
+            if kb_id in self.vectors:
+                self.vectors[kb_id] = [(c, e, t) for c, e, t in self.vectors[kb_id] if c != chunk_id]
+        else:
+            if kb_id in self.vectors:
+                del self.vectors[kb_id]
+
+vector_store = SimpleVectorStore()
+
+async def get_embedding(text: str) -> list:
+    """获取文本的向量表示"""
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key:
+        # 简单的哈希向量（仅用于演示）
+        import hashlib
+        hash_val = hashlib.md5(text.encode()).hexdigest()
+        return [int(hash_val[i:i+2], 16) / 255.0 for i in range(0, 32, 2)]
+    
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.post(
+            "https://api.openai.com/v1/embeddings",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={"model": "text-embedding-3-small", "input": text}
+        )
+        if response.status_code == 200:
+            return response.json()["data"][0]["embedding"]
+    
+    return [0.0] * 1536
+
+def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list:
+    """将文本分块"""
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        chunk = text[start:end]
+        if chunk.strip():
+            chunks.append(chunk)
+        start = end - overlap
+    return chunks
+
+@app.post("/api/rag/index")
+async def index_document(data: dict, user=Depends(get_current_user)):
+    """索引文档到向量库"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    kb_id = data.get("kb_id")
+    content = data.get("content", "")
+    filename = data.get("filename", "document")
+    
+    if not content:
+        raise HTTPException(status_code=400, detail="内容不能为空")
+    
+    # 分块
+    chunks = chunk_text(content)
+    indexed = 0
+    
+    for i, chunk in enumerate(chunks):
+        chunk_id = f"{filename}_{i}"
+        embedding = await get_embedding(chunk)
+        
+        # 存储到向量库
+        vector_store.add(kb_id, chunk_id, embedding, chunk)
+        
+        # 存储到数据库
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(
+                "INSERT INTO vector_documents (kb_id, chunk_id, content, embedding, metadata) VALUES (?, ?, ?, ?, ?)",
+                (kb_id, chunk_id, chunk, json.dumps(embedding[:10]), json.dumps({"filename": filename, "index": i}))
+            )
+        indexed += 1
+    
+    return {"success": True, "indexed_chunks": indexed}
+
+@app.post("/api/rag/search")
+async def search_rag(data: dict, user=Depends(get_current_user)):
+    """RAG 语义搜索"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    kb_id = data.get("kb_id")
+    query = data.get("query", "")
+    top_k = data.get("top_k", 5)
+    
+    if not query:
+        raise HTTPException(status_code=400, detail="查询不能为空")
+    
+    # 获取查询向量
+    query_embedding = await get_embedding(query)
+    
+    # 搜索
+    results = vector_store.search(kb_id, query_embedding, top_k)
+    
+    return {
+        "results": [
+            {"chunk_id": r[0], "score": r[1], "content": r[2]}
+            for r in results
+        ]
+    }
+
+@app.post("/api/rag/chat")
+async def rag_chat(data: dict, user=Depends(get_current_user)):
+    """基于 RAG 的对话"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    kb_id = data.get("kb_id")
+    question = data.get("question", "")
+    
+    # 搜索相关文档
+    query_embedding = await get_embedding(question)
+    results = vector_store.search(kb_id, query_embedding, top_k=3)
+    
+    # 构建上下文
+    context = "\n\n".join([r[2] for r in results])
+    
+    # 调用 AI
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key:
+        return {"answer": "未配置 API Key", "sources": []}
+    
+    prompt = f"""基于以下参考资料回答问题。如果资料中没有相关信息，请说明。
+
+参考资料：
+{context}
+
+问题：{question}
+
+请用中文回答："""
+    
+    async with httpx.AsyncClient(timeout=60) as client:
+        response = await client.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "model": "gpt-4o-mini",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 1000
+            }
+        )
+        if response.status_code == 200:
+            answer = response.json()["choices"][0]["message"]["content"]
+            return {
+                "answer": answer,
+                "sources": [{"chunk_id": r[0], "score": r[1]} for r in results]
+            }
+    
+    return {"answer": "生成回答失败", "sources": []}
+
+# ========== RBAC 权限系统 ==========
+class RBACManager:
+    """角色权限管理"""
+    
+    def __init__(self):
+        self.permission_cache = {}
+    
+    def get_user_permissions(self, user_id: int) -> list:
+        """获取用户所有权限"""
+        if user_id in self.permission_cache:
+            return self.permission_cache[user_id]
+        
+        with sqlite3.connect(DB_PATH) as conn:
+            rows = conn.execute("""
+                SELECT r.permissions FROM roles r
+                JOIN user_roles ur ON r.id = ur.role_id
+                WHERE ur.user_id = ?
+            """, (user_id,)).fetchall()
+            
+            permissions = set()
+            for row in rows:
+                perms = json.loads(row[0])
+                permissions.update(perms)
+            
+            self.permission_cache[user_id] = list(permissions)
+            return list(permissions)
+    
+    def has_permission(self, user_id: int, permission: str) -> bool:
+        """检查用户是否有某权限"""
+        perms = self.get_user_permissions(user_id)
+        return "*" in perms or permission in perms
+    
+    def assign_role(self, user_id: int, role_name: str):
+        """分配角色给用户"""
+        with sqlite3.connect(DB_PATH) as conn:
+            role = conn.execute("SELECT id FROM roles WHERE name = ?", (role_name,)).fetchone()
+            if role:
+                conn.execute(
+                    "INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)",
+                    (user_id, role[0])
+                )
+                if user_id in self.permission_cache:
+                    del self.permission_cache[user_id]
+    
+    def remove_role(self, user_id: int, role_name: str):
+        """移除用户角色"""
+        with sqlite3.connect(DB_PATH) as conn:
+            role = conn.execute("SELECT id FROM roles WHERE name = ?", (role_name,)).fetchone()
+            if role:
+                conn.execute(
+                    "DELETE FROM user_roles WHERE user_id = ? AND role_id = ?",
+                    (user_id, role[0])
+                )
+                if user_id in self.permission_cache:
+                    del self.permission_cache[user_id]
+    
+    def clear_cache(self, user_id: int = None):
+        if user_id:
+            self.permission_cache.pop(user_id, None)
+        else:
+            self.permission_cache.clear()
+
+rbac = RBACManager()
+
+def require_permission(permission: str):
+    """权限检查装饰器"""
+    async def check(user=Depends(get_current_user)):
+        if not user:
+            raise HTTPException(status_code=401, detail="请先登录")
+        if not rbac.has_permission(user["id"], permission):
+            raise HTTPException(status_code=403, detail=f"无权限: {permission}")
+        return user
+    return check
+
+@app.get("/api/rbac/roles")
+async def list_roles(user=Depends(get_current_user)):
+    """获取所有角色"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM roles").fetchall()
+        return [dict(r) for r in rows]
+
+@app.post("/api/rbac/roles")
+async def create_role(data: dict, user=Depends(get_current_user)):
+    """创建角色"""
+    if not user or not rbac.has_permission(user["id"], "admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO roles (name, description, permissions) VALUES (?, ?, ?)",
+            (data.get("name"), data.get("description"), json.dumps(data.get("permissions", [])))
+        )
+    return {"success": True}
+
+@app.post("/api/rbac/assign")
+async def assign_role_to_user(data: dict, user=Depends(get_current_user)):
+    """分配角色给用户"""
+    if not user or not rbac.has_permission(user["id"], "admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    
+    rbac.assign_role(data.get("user_id"), data.get("role"))
+    return {"success": True}
+
+@app.get("/api/rbac/my-permissions")
+async def get_my_permissions(user=Depends(get_current_user)):
+    """获取当前用户权限"""
+    if not user:
+        return {"permissions": []}
+    return {"permissions": rbac.get_user_permissions(user["id"])}
+
+# ========== 计费系统 ==========
+class BillingManager:
+    """计费管理"""
+    
+    def get_user_subscription(self, user_id: int) -> dict:
+        """获取用户订阅"""
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            sub = conn.execute("""
+                SELECT s.*, p.name as plan_name, p.price, p.tokens_limit, p.features
+                FROM subscriptions s
+                JOIN billing_plans p ON s.plan_id = p.id
+                WHERE s.user_id = ? AND s.status = 'active'
+                ORDER BY s.end_date DESC LIMIT 1
+            """, (user_id,)).fetchone()
+            return dict(sub) if sub else None
+    
+    def get_usage(self, user_id: int, period: str = "month") -> dict:
+        """获取用量统计"""
+        with sqlite3.connect(DB_PATH) as conn:
+            if period == "month":
+                date_filter = "date('now', 'start of month')"
+            elif period == "day":
+                date_filter = "date('now')"
+            else:
+                date_filter = "date('now', '-30 days')"
+            
+            usage = conn.execute(f"""
+                SELECT type, SUM(amount) as total, SUM(total_cost) as cost
+                FROM usage_records
+                WHERE user_id = ? AND created_at >= {date_filter}
+                GROUP BY type
+            """, (user_id,)).fetchall()
+            
+            return {row[0]: {"amount": row[1], "cost": row[2]} for row in usage}
+    
+    def record_usage(self, user_id: int, usage_type: str, amount: int, unit_price: float = 0):
+        """记录用量"""
+        total_cost = amount * unit_price
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(
+                "INSERT INTO usage_records (user_id, type, amount, unit_price, total_cost) VALUES (?, ?, ?, ?, ?)",
+                (user_id, usage_type, amount, unit_price, total_cost)
+            )
+    
+    def check_quota(self, user_id: int) -> Tuple[bool, int]:
+        """检查配额"""
+        sub = self.get_user_subscription(user_id)
+        if not sub:
+            # 免费用户
+            limit = 10000
+        else:
+            limit = sub["tokens_limit"]
+        
+        if limit == -1:  # 无限
+            return True, -1
+        
+        with sqlite3.connect(DB_PATH) as conn:
+            used = conn.execute("""
+                SELECT COALESCE(SUM(amount), 0) FROM usage_records
+                WHERE user_id = ? AND type = 'tokens' AND created_at >= date('now', 'start of month')
+            """, (user_id,)).fetchone()[0]
+        
+        return used < limit, limit - used
+    
+    def create_subscription(self, user_id: int, plan_id: str, months: int = 1) -> str:
+        """创建订阅"""
+        with sqlite3.connect(DB_PATH) as conn:
+            # 获取套餐信息
+            plan = conn.execute("SELECT * FROM billing_plans WHERE id = ?", (plan_id,)).fetchone()
+            if not plan:
+                raise ValueError("套餐不存在")
+            
+            start_date = datetime.now()
+            end_date = start_date + timedelta(days=30 * months)
+            
+            conn.execute(
+                "INSERT INTO subscriptions (user_id, plan_id, start_date, end_date) VALUES (?, ?, ?, ?)",
+                (user_id, plan_id, start_date, end_date)
+            )
+            
+            # 创建发票
+            invoice_id = f"INV_{secrets.token_hex(8)}"
+            amount = plan[2] * months  # price * months
+            conn.execute(
+                "INSERT INTO invoices (id, user_id, amount, status) VALUES (?, ?, ?, 'pending')",
+                (invoice_id, user_id, amount)
+            )
+            
+            return invoice_id
+
+billing = BillingManager()
+
+@app.get("/api/billing/plans")
+async def get_billing_plans():
+    """获取所有套餐"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM billing_plans WHERE is_active = 1").fetchall()
+        return [dict(r) for r in rows]
+
+@app.get("/api/billing/subscription")
+async def get_subscription(user=Depends(get_current_user)):
+    """获取当前订阅"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    sub = billing.get_user_subscription(user["id"])
+    return sub or {"plan": "free", "tokens_limit": 10000}
+
+@app.post("/api/billing/subscribe")
+async def subscribe(data: dict, user=Depends(get_current_user)):
+    """订阅套餐"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    plan_id = data.get("plan_id")
+    months = data.get("months", 1)
+    
+    try:
+        invoice_id = billing.create_subscription(user["id"], plan_id, months)
+        return {"success": True, "invoice_id": invoice_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/billing/usage")
+async def get_usage(period: str = "month", user=Depends(get_current_user)):
+    """获取用量统计"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    usage = billing.get_usage(user["id"], period)
+    allowed, remaining = billing.check_quota(user["id"])
+    
+    return {
+        "usage": usage,
+        "quota": {"allowed": allowed, "remaining": remaining}
+    }
+
+@app.get("/api/billing/invoices")
+async def get_invoices(user=Depends(get_current_user)):
+    """获取发票列表"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM invoices WHERE user_id = ? ORDER BY created_at DESC",
+            (user["id"],)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+@app.post("/api/billing/pay/{invoice_id}")
+async def pay_invoice(invoice_id: str, data: dict, user=Depends(get_current_user)):
+    """支付发票（模拟）"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    payment_method = data.get("method", "alipay")  # alipay, wechat, stripe
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        invoice = conn.execute(
+            "SELECT * FROM invoices WHERE id = ? AND user_id = ?",
+            (invoice_id, user["id"])
+        ).fetchone()
+        
+        if not invoice:
+            raise HTTPException(status_code=404, detail="发票不存在")
+        
+        # 模拟支付成功
+        conn.execute(
+            "UPDATE invoices SET status = 'paid', paid_at = ? WHERE id = ?",
+            (datetime.now(), invoice_id)
+        )
+        
+        # 激活订阅
+        conn.execute(
+            "UPDATE subscriptions SET status = 'active' WHERE user_id = ? AND status = 'pending'",
+            (user["id"],)
+        )
+    
+    return {"success": True, "message": "支付成功"}
+
+# ========== 实时协作 ==========
+collaboration_sessions = {}  # session_id -> {participants: set, messages: list}
+
+@app.post("/api/collab/create")
+async def create_collab_session(data: dict, user=Depends(get_current_user)):
+    """创建协作会话"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    conversation_id = data.get("conversation_id")
+    session_id = f"collab_{secrets.token_hex(8)}"
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO collaboration_sessions (id, conversation_id, created_by) VALUES (?, ?, ?)",
+            (session_id, conversation_id, user["id"])
+        )
+        conn.execute(
+            "INSERT INTO collaboration_participants (session_id, user_id, role) VALUES (?, ?, 'owner')",
+            (session_id, user["id"])
+        )
+    
+    collaboration_sessions[session_id] = {"participants": {user["id"]}, "messages": []}
+    
+    return {"session_id": session_id, "share_link": f"/collab/{session_id}"}
+
+@app.post("/api/collab/{session_id}/join")
+async def join_collab_session(session_id: str, user=Depends(get_current_user)):
+    """加入协作会话"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        session = conn.execute(
+            "SELECT * FROM collaboration_sessions WHERE id = ? AND is_active = 1",
+            (session_id,)
+        ).fetchone()
+        
+        if not session:
+            raise HTTPException(status_code=404, detail="会话不存在")
+        
+        conn.execute(
+            "INSERT OR IGNORE INTO collaboration_participants (session_id, user_id) VALUES (?, ?)",
+            (session_id, user["id"])
+        )
+    
+    if session_id in collaboration_sessions:
+        collaboration_sessions[session_id]["participants"].add(user["id"])
+    
+    return {"success": True}
+
+@app.websocket("/ws/collab/{session_id}")
+async def collab_websocket(websocket: WebSocket, session_id: str):
+    """协作 WebSocket"""
+    await websocket.accept()
+    
+    if session_id not in collaboration_sessions:
+        collaboration_sessions[session_id] = {"participants": set(), "messages": []}
+    
+    try:
+        while True:
+            data = await websocket.receive_json()
+            
+            # 广播消息给所有参与者
+            message = {
+                "type": data.get("type", "message"),
+                "content": data.get("content"),
+                "user_id": data.get("user_id"),
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            collaboration_sessions[session_id]["messages"].append(message)
+            
+            # 这里应该广播给所有连接的 WebSocket
+            await websocket.send_json(message)
+            
+    except WebSocketDisconnect:
+        pass
+
+# ========== 插件系统 ==========
+@app.get("/api/plugins")
+async def list_plugins():
+    """获取插件列表"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM plugins").fetchall()
+        return [dict(r) for r in rows]
+
+@app.post("/api/plugins/install")
+async def install_plugin(data: dict, user=Depends(get_current_user)):
+    """安装插件"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    plugin_id = data.get("plugin_id")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO user_plugins (user_id, plugin_id) VALUES (?, ?)",
+            (user["id"], plugin_id)
+        )
+    
+    return {"success": True}
+
+@app.post("/api/plugins/{plugin_id}/toggle")
+async def toggle_plugin(plugin_id: str, user=Depends(get_current_user)):
+    """启用/禁用插件"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        current = conn.execute(
+            "SELECT enabled FROM user_plugins WHERE user_id = ? AND plugin_id = ?",
+            (user["id"], plugin_id)
+        ).fetchone()
+        
+        if current:
+            new_state = 0 if current[0] else 1
+            conn.execute(
+                "UPDATE user_plugins SET enabled = ? WHERE user_id = ? AND plugin_id = ?",
+                (new_state, user["id"], plugin_id)
+            )
+            return {"success": True, "enabled": new_state == 1}
+    
+    raise HTTPException(status_code=404, detail="插件未安装")
 
 # ========== 静态文件 ==========
 import pathlib

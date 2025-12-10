@@ -8,3 +8,5 @@
 2025-12-10 23:21:15,620 - INFO - [__main__] AI Hub started successfully
 2025-12-10 23:35:28,904 - INFO - [__main__] AI Hub starting...
 2025-12-10 23:35:28,964 - WARNING - [__main__] Redis not available, using memory cache: No module named 'redis'
+2025-12-10 23:35:29,025 - INFO - [__main__] Task queue started
+2025-12-10 23:35:29,025 - INFO - [__main__] AI Hub started successfully

@@ -12,5 +12,9 @@ websockets>=12.0
 # 性能优化
 redis>=5.0.0
 psutil>=5.9.0
-# 可选：异步任务
 aiofiles>=23.0.0
+# RAG 向量检索
+numpy>=1.24.0
+# 可选：生产级向量数据库
+# pinecone-client>=2.0.0
+# pymilvus>=2.3.0

@@ -252,6 +252,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="nav-item" data-page="tokens"><span class="nav-item-icon">🔑</span> API Token</div>
 <div class="nav-item" data-page="teams"><span class="nav-item-icon">👥</span> 团队空间</div>
 <div class="nav-item" data-page="knowledge"><span class="nav-item-icon">📚</span> 知识库</div>
+<div class="nav-item" data-page="rag"><span class="nav-item-icon">🔍</span> RAG 检索</div>
+<div class="nav-item" data-page="billing"><span class="nav-item-icon">💳</span> 订阅计费</div>
+<div class="nav-item" data-page="rbac"><span class="nav-item-icon">🛡️</span> 权限管理</div>
 </div>
 <div class="nav-divider"></div>
 <div class="nav-section">
@@ -690,6 +693,80 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 <p style="color:var(--text2);margin-bottom:20px">上传文档建立私有知识库，让 AI 基于你的资料回答</p>
 <div id="kbList"></div>
+</div>
+</div></div></div></div>
+<!-- RAG 检索页 -->
+<div id="page-rag" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>🔍</span> RAG 语义检索</h4>
+<p style="color:var(--text2);margin-bottom:20px">基于向量的语义搜索，让 AI 理解你的文档内容</p>
+<div class="form-group"><label>选择知识库</label><select id="ragKbSelect" style="width:100%;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text)"></select></div>
+<div class="form-group"><label>搜索问题</label><input type="text" id="ragQuery" placeholder="输入你的问题..."></div>
+<button class="btn btn-primary" onclick="searchRAG()">🔍 语义搜索</button>
+<button class="btn btn-ghost" onclick="chatWithRAG()" style="margin-left:8px">💬 RAG 对话</button>
+</div>
+<div class="settings-section">
+<h4><span>📄</span> 搜索结果</h4>
+<div id="ragResults" style="min-height:100px"><p style="color:var(--text2)">输入问题后点击搜索</p></div>
+</div>
+<div class="settings-section">
+<h4><span>📤</span> 索引文档</h4>
+<div class="form-group"><label>文档内容</label><textarea id="ragContent" rows="6" placeholder="粘贴文档内容..."></textarea></div>
+<div class="form-group"><label>文件名</label><input type="text" id="ragFilename" placeholder="document.txt"></div>
+<button class="btn btn-primary" onclick="indexDocument()">📥 索引文档</button>
+</div>
+</div></div></div></div>
+<!-- 订阅计费页 -->
+<div id="page-billing" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>💳</span> 订阅计费</h4>
+<div id="currentSubscription" style="padding:20px;background:var(--bg);border-radius:12px;margin-bottom:20px">
+<div style="display:flex;justify-content:space-between;align-items:center">
+<div><div style="font-size:12px;color:var(--text2)">当前套餐</div><div style="font-size:24px;font-weight:600" id="currentPlanName">免费版</div></div>
+<div style="text-align:right"><div style="font-size:12px;color:var(--text2)">剩余额度</div><div style="font-size:24px;font-weight:600;color:var(--accent)" id="remainingQuota">10,000</div></div>
+</div>
+</div>
+</div>
+<div class="settings-section">
+<h4><span>📦</span> 套餐选择</h4>
+<div id="billingPlans" class="price-cards"></div>
+</div>
+<div class="settings-section">
+<h4><span>📊</span> 用量统计</h4>
+<div id="usageStats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px"></div>
+</div>
+<div class="settings-section">
+<h4><span>🧾</span> 发票记录</h4>
+<div id="invoiceList"></div>
+</div>
+</div></div></div></div>
+<!-- 权限管理页 -->
+<div id="page-rbac" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>🛡️</span> 权限管理</h4>
+<p style="color:var(--text2);margin-bottom:20px">基于角色的访问控制 (RBAC)</p>
+<div style="padding:16px;background:var(--bg);border-radius:10px;margin-bottom:16px">
+<div style="font-size:12px;color:var(--text2);margin-bottom:8px">我的权限</div>
+<div id="myPermissions" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+</div>
+</div>
+<div class="settings-section">
+<h4><span>👥</span> 角色列表</h4>
+<div id="rolesList"></div>
+<button class="btn btn-ghost" onclick="showCreateRoleModal()" style="margin-top:12px">+ 创建角色</button>
+</div>
+<div class="settings-section">
+<h4><span>🔑</span> 权限说明</h4>
+<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;font-size:13px">
+<div style="padding:12px;background:var(--bg);border-radius:8px"><strong>chat</strong> - 对话功能</div>
+<div style="padding:12px;background:var(--bg);border-radius:8px"><strong>notes</strong> - 笔记功能</div>
+<div style="padding:12px;background:var(--bg);border-radius:8px"><strong>memory</strong> - 全局记忆</div>
+<div style="padding:12px;background:var(--bg);border-radius:8px"><strong>image</strong> - 图片生成</div>
+<div style="padding:12px;background:var(--bg);border-radius:8px"><strong>code</strong> - 代码运行</div>
+<div style="padding:12px;background:var(--bg);border-radius:8px"><strong>rag</strong> - RAG 检索</div>
+<div style="padding:12px;background:var(--bg);border-radius:8px"><strong>admin</strong> - 管理功能</div>
+<div style="padding:12px;background:var(--bg);border-radius:8px"><strong>*</strong> - 所有权限</div>
+</div>
 </div>
 </div></div></div></div>
 <!-- MCP页 -->
@@ -1274,7 +1351,7 @@ function showModal(id){$(id).classList.add('show')}
 function setAccent(c){document.documentElement.style.setProperty('--accent',c)}
 function toggleCollapse(el){var content=el.nextElementSibling;content.classList.toggle('show');el.querySelector('span:last-child').textContent=content.classList.contains('show')?'▲':'▼'}
 function api(path,options){options=options||{};var headers=Object.assign({'Content-Type':'application/json'},options.headers||{});if(authToken)headers['Authorization']='Bearer '+authToken;return fetch(path,Object.assign({},options,{headers:headers})).then(function(res){if(!res.ok)return res.json().then(function(e){throw new Error(e.detail||'Error')});return res.json()})}
-document.querySelectorAll('.nav-item[data-page]').forEach(function(n){n.onclick=function(){document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});n.classList.add('active');var page=$('page-'+n.dataset.page);if(page)page.classList.add('active');if(n.dataset.page==='stats')loadStats();if(n.dataset.page==='tokens')loadTokens();if(n.dataset.page==='teams')loadTeams();if(n.dataset.page==='knowledge')loadKnowledgeBases();if(n.dataset.page==='workflows')loadWorkflowTemplates();if(n.dataset.page==='traces')loadTraces();if(n.dataset.page==='integrations')loadFeatureFlags();closeMobileMenus()}});
+document.querySelectorAll('.nav-item[data-page]').forEach(function(n){n.onclick=function(){document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});n.classList.add('active');var page=$('page-'+n.dataset.page);if(page)page.classList.add('active');if(n.dataset.page==='stats')loadStats();if(n.dataset.page==='tokens')loadTokens();if(n.dataset.page==='teams')loadTeams();if(n.dataset.page==='knowledge')loadKnowledgeBases();if(n.dataset.page==='workflows')loadWorkflowTemplates();if(n.dataset.page==='traces')loadTraces();if(n.dataset.page==='integrations')loadFeatureFlags();if(n.dataset.page==='rag')loadRAGKnowledgeBases();if(n.dataset.page==='billing'){loadBillingPlans();loadSubscription();loadUsageStats();loadInvoices()}if(n.dataset.page==='rbac'){loadMyPermissions();loadRoles()}closeMobileMenus()}});
 function showAuthModal(){isRegisterMode=false;updateAuthUI();showModal('authModal')}
 function toggleAuthMode(){isRegisterMode=!isRegisterMode;updateAuthUI()}
 function updateAuthUI(){$('authTitle').textContent=isRegisterMode?'注册':'登录';$('authSubmit').textContent=isRegisterMode?'注册':'登录';$('authEmailGroup').style.display=isRegisterMode?'block':'none';$('authSwitch').innerHTML=isRegisterMode?'已有账号？<a href="#" onclick="toggleAuthMode()" style="color:var(--accent)">登录</a>':'没有账号？<a href="#" onclick="toggleAuthMode()" style="color:var(--accent)">注册</a>'}
@@ -1855,6 +1932,144 @@ a.click();
 showToast('追踪数据已导出')
 }).catch(function(e){alert('导出失败: '+e.message)})
 }).catch(function(e){alert('获取追踪失败: '+e.message)})}
+
+// ========== RAG 检索 ==========
+function loadRAGKnowledgeBases(){
+api('/api/knowledge-bases').then(function(data){
+var html='<option value="">选择知识库</option>';
+data.forEach(function(kb){html+='<option value="'+kb.id+'">'+kb.name+'</option>'});
+$('ragKbSelect').innerHTML=html
+}).catch(function(){})}
+
+function searchRAG(){
+var kbId=$('ragKbSelect').value;
+var query=$('ragQuery').value.trim();
+if(!kbId){alert('请选择知识库');return}
+if(!query){alert('请输入问题');return}
+$('ragResults').innerHTML='<p style="color:var(--text2)">搜索中...</p>';
+api('/api/rag/search',{method:'POST',body:JSON.stringify({kb_id:parseInt(kbId),query:query,top_k:5})}).then(function(data){
+if(data.results.length===0){$('ragResults').innerHTML='<p style="color:var(--text2)">未找到相关内容</p>';return}
+var html=data.results.map(function(r,i){
+return'<div style="padding:16px;background:var(--bg);border-radius:10px;margin-bottom:12px;border-left:4px solid var(--accent)"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-weight:500">#'+(i+1)+' '+r.chunk_id+'</span><span style="color:var(--accent)">相似度: '+(r.score*100).toFixed(1)+'%</span></div><div style="font-size:14px;color:var(--text2);line-height:1.6">'+r.content.slice(0,300)+(r.content.length>300?'...':'')+'</div></div>'
+}).join('');
+$('ragResults').innerHTML=html
+}).catch(function(e){$('ragResults').innerHTML='<p style="color:var(--error)">搜索失败: '+e.message+'</p>'})}
+
+function chatWithRAG(){
+var kbId=$('ragKbSelect').value;
+var query=$('ragQuery').value.trim();
+if(!kbId){alert('请选择知识库');return}
+if(!query){alert('请输入问题');return}
+$('ragResults').innerHTML='<p style="color:var(--text2)">AI 正在思考...</p>';
+api('/api/rag/chat',{method:'POST',body:JSON.stringify({kb_id:parseInt(kbId),question:query})}).then(function(data){
+var html='<div style="padding:20px;background:var(--bg);border-radius:12px"><div style="font-size:14px;line-height:1.8">'+marked.parse(data.answer)+'</div>';
+if(data.sources&&data.sources.length>0){
+html+='<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)"><div style="font-size:12px;color:var(--text2);margin-bottom:8px">参考来源:</div>';
+data.sources.forEach(function(s){html+='<span class="tag" style="margin-right:8px">'+s.chunk_id+' ('+(s.score*100).toFixed(0)+'%)</span>'});
+html+='</div>'}
+html+='</div>';
+$('ragResults').innerHTML=html
+}).catch(function(e){$('ragResults').innerHTML='<p style="color:var(--error)">对话失败: '+e.message+'</p>'})}
+
+function indexDocument(){
+var kbId=$('ragKbSelect').value;
+var content=$('ragContent').value.trim();
+var filename=$('ragFilename').value.trim()||'document.txt';
+if(!kbId){alert('请选择知识库');return}
+if(!content){alert('请输入文档内容');return}
+showToast('正在索引文档...');
+api('/api/rag/index',{method:'POST',body:JSON.stringify({kb_id:parseInt(kbId),content:content,filename:filename})}).then(function(data){
+showToast('索引完成，共 '+data.indexed_chunks+' 个分块');
+$('ragContent').value='';
+$('ragFilename').value=''
+}).catch(function(e){alert('索引失败: '+e.message)})}
+
+// ========== 计费系统 ==========
+function loadBillingPlans(){
+api('/api/billing/plans').then(function(data){
+var html=data.map(function(p){
+var features=JSON.parse(p.features||'[]');
+return'<div class="price-card" onclick="subscribePlan(\''+p.id+'\')"><h4>'+p.name+'</h4><div class="price">¥'+p.price+'<span>/月</span></div><ul>'+features.map(function(f){return'<li>'+f+'</li>'}).join('')+'</ul><button class="btn btn-primary" style="width:100%">选择</button></div>'
+}).join('');
+$('billingPlans').innerHTML=html
+}).catch(function(){})}
+
+function loadSubscription(){
+api('/api/billing/subscription').then(function(data){
+$('currentPlanName').textContent=data.plan_name||data.plan||'免费版';
+var remaining=data.tokens_limit===-1?'无限':formatNumber(data.tokens_limit||10000);
+$('remainingQuota').textContent=remaining
+}).catch(function(){})}
+
+function loadUsageStats(){
+api('/api/billing/usage?period=month').then(function(data){
+var html='';
+for(var type in data.usage){
+var u=data.usage[type];
+html+='<div style="padding:16px;background:var(--bg);border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:600;color:var(--accent)">'+formatNumber(u.amount)+'</div><div style="font-size:12px;color:var(--text2);margin-top:4px">'+type+'</div><div style="font-size:11px;color:var(--success);margin-top:4px">¥'+u.cost.toFixed(2)+'</div></div>'
+}
+$('usageStats').innerHTML=html||'<p style="color:var(--text2);grid-column:1/-1;text-align:center">暂无用量数据</p>'
+}).catch(function(){})}
+
+function loadInvoices(){
+api('/api/billing/invoices').then(function(data){
+if(data.length===0){$('invoiceList').innerHTML='<p style="color:var(--text2)">暂无发票</p>';return}
+var html=data.map(function(inv){
+var statusColor=inv.status==='paid'?'var(--success)':'var(--warning)';
+return'<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:500">'+inv.id+'</div><div style="font-size:12px;color:var(--text2)">'+(inv.created_at||'').slice(0,10)+'</div></div><div style="text-align:right"><div style="font-weight:600">¥'+inv.amount+'</div><div style="font-size:12px;color:'+statusColor+'">'+(inv.status==='paid'?'已支付':'待支付')+'</div></div>'+(inv.status!=='paid'?'<button class="btn btn-primary btn-sm" onclick="payInvoice(\''+inv.id+'\')">支付</button>':'')+'</div>'
+}).join('');
+$('invoiceList').innerHTML=html
+}).catch(function(){})}
+
+function subscribePlan(planId){
+if(!authToken){alert('请先登录');return}
+if(!confirm('确定订阅此套餐？'))return;
+api('/api/billing/subscribe',{method:'POST',body:JSON.stringify({plan_id:planId,months:1})}).then(function(data){
+showToast('订阅成功，请支付发票');
+loadInvoices();
+loadSubscription()
+}).catch(function(e){alert('订阅失败: '+e.message)})}
+
+function payInvoice(invoiceId){
+if(!confirm('确定支付？'))return;
+api('/api/billing/pay/'+invoiceId,{method:'POST',body:JSON.stringify({method:'alipay'})}).then(function(){
+showToast('支付成功！');
+loadInvoices();
+loadSubscription()
+}).catch(function(e){alert('支付失败: '+e.message)})}
+
+// ========== RBAC 权限 ==========
+function loadMyPermissions(){
+api('/api/rbac/my-permissions').then(function(data){
+var html=data.permissions.map(function(p){
+return'<span class="tag tag-primary">'+p+'</span>'
+}).join('');
+$('myPermissions').innerHTML=html||'<span style="color:var(--text2)">暂无权限</span>'
+}).catch(function(){})}
+
+function loadRoles(){
+api('/api/rbac/roles').then(function(data){
+var html=data.map(function(r){
+var perms=JSON.parse(r.permissions||'[]');
+return'<div style="padding:16px;background:var(--bg);border-radius:10px;margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><strong>'+r.name+'</strong><span style="font-size:12px;color:var(--text2)">'+r.description+'</span></div><div style="display:flex;flex-wrap:wrap;gap:6px">'+perms.map(function(p){return'<span class="tag">'+p+'</span>'}).join('')+'</div></div>'
+}).join('');
+$('rolesList').innerHTML=html
+}).catch(function(){})}
+
+function showCreateRoleModal(){
+var html='<div class="form-group"><label>角色名称</label><input type="text" id="newRoleName" placeholder="role_name"></div><div class="form-group"><label>描述</label><input type="text" id="newRoleDesc" placeholder="角色描述"></div><div class="form-group"><label>权限（逗号分隔）</label><input type="text" id="newRolePerms" placeholder="chat,notes,memory"></div><div style="display:flex;gap:12px"><button class="btn btn-primary" onclick="createRole()">创建</button><button class="btn btn-ghost" onclick="closeModal(\'roleModal\')">取消</button></div>';
+showCustomModal('创建角色',html,'roleModal')}
+
+function createRole(){
+var name=$('newRoleName').value.trim();
+var desc=$('newRoleDesc').value.trim();
+var perms=$('newRolePerms').value.split(',').map(function(p){return p.trim()}).filter(function(p){return p});
+if(!name){alert('请输入角色名称');return}
+api('/api/rbac/roles',{method:'POST',body:JSON.stringify({name:name,description:desc,permissions:perms})}).then(function(){
+closeModal('roleModal');
+loadRoles();
+showToast('角色已创建')
+}).catch(function(e){alert('创建失败: '+e.message)})}
 
 // 初始化时加载推荐
 setTimeout(loadRecommendations,1000);
