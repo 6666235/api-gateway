@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-hub-config
+data:
+  LOG_LEVEL: "INFO"
+  DOCKER_SANDBOX: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ai-hub-secrets
+type: Opaque
+stringData:
+  redis-url: "redis://redis-service:6379/0"
+  encryption-key: "your-encryption-key-here"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ai-hub-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard

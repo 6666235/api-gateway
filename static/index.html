@@ -18,10 +18,10 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:hidden}
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-.nav{width:220px;background:var(--bg2);display:flex;flex-direction:column;border-right:1px solid var(--border);flex-shrink:0}
+.nav{width:220px;background:var(--bg2);display:flex;flex-direction:column;border-right:1px solid var(--border);flex-shrink:0;overflow-y:auto;overflow-x:hidden}
 .nav-header{padding:20px 16px;border-bottom:1px solid var(--border)}
 .nav-logo{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600}
-.nav-section{padding:12px 8px}
+.nav-section{padding:12px 8px;flex:1;overflow-y:auto}
 .nav-section-title{font-size:11px;color:var(--text2);padding:8px 12px;text-transform:uppercase;letter-spacing:1px}
 .nav-item{display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--text2);transition:all .15s;margin-bottom:2px}
 .nav-item:hover{background:var(--bg3);color:var(--text)}
@@ -256,6 +256,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="nav-item" data-page="rag"><span class="nav-item-icon">🔍</span> RAG 检索</div>
 <div class="nav-item" data-page="billing"><span class="nav-item-icon">💳</span> 订阅计费</div>
 <div class="nav-item" data-page="rbac"><span class="nav-item-icon">🛡️</span> 权限管理</div>
+<div class="nav-item" data-page="audit"><span class="nav-item-icon">📜</span> 审计日志</div>
+<div class="nav-item" data-page="security"><span class="nav-item-icon">🔒</span> 安全中心</div>
+<div class="nav-item" data-page="monitoring"><span class="nav-item-icon">📊</span> 系统监控</div>
+<div class="nav-item" data-page="tasks"><span class="nav-item-icon">⚙️</span> 任务队列</div>
 </div>
 <div class="nav-divider"></div>
 <div class="nav-section">
@@ -796,6 +800,141 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div style="padding:12px;background:var(--bg);border-radius:8px"><strong>admin</strong> - 管理功能</div>
 <div style="padding:12px;background:var(--bg);border-radius:8px"><strong>*</strong> - 所有权限</div>
 </div>
+</div>
+</div></div></div></div>
+<!-- 审计日志页 -->
+<div id="page-audit" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+<h4 style="margin:0"><span>📜</span> 审计日志</h4>
+<div style="display:flex;gap:8px">
+<select id="auditEventFilter" style="padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)" onchange="loadAuditLogs()">
+<option value="">全部事件</option>
+<option value="user.login">用户登录</option>
+<option value="data.export">数据导出</option>
+<option value="settings.change">设置变更</option>
+<option value="payment.create">支付创建</option>
+<option value="security.alert">安全警报</option>
+</select>
+<button class="btn btn-ghost btn-sm" onclick="loadAuditLogs()">🔄 刷新</button>
+<button class="btn btn-ghost btn-sm" onclick="exportAuditLogs()">📥 导出</button>
+</div>
+</div>
+<div id="auditLogsList" style="max-height:400px;overflow-y:auto"></div>
+</div>
+<div class="settings-section">
+<h4><span>📊</span> 合规报告</h4>
+<div style="display:flex;gap:12px;margin-bottom:16px">
+<button class="btn btn-primary" onclick="generateComplianceReport('month')">月度报告</button>
+<button class="btn btn-ghost" onclick="generateComplianceReport('quarter')">季度报告</button>
+<button class="btn btn-ghost" onclick="generateComplianceReport('year')">年度报告</button>
+</div>
+<div id="complianceReport"></div>
+</div>
+</div></div></div></div>
+<!-- 安全中心页 -->
+<div id="page-security" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>🔒</span> 安全中心</h4>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px">
+<div style="padding:20px;background:var(--bg);border-radius:12px;text-align:center">
+<div style="font-size:28px;font-weight:700;color:var(--error)" id="blockedIpsCount">0</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">封禁 IP</div>
+</div>
+<div style="padding:20px;background:var(--bg);border-radius:12px;text-align:center">
+<div style="font-size:28px;font-weight:700;color:var(--warning)" id="failedAttemptsCount">0</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">失败尝试</div>
+</div>
+<div style="padding:20px;background:var(--bg);border-radius:12px;text-align:center">
+<div style="font-size:28px;font-weight:700;color:var(--success)" id="twoFaUsersCount">0</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">2FA 用户</div>
+</div>
+<div style="padding:20px;background:var(--bg);border-radius:12px;text-align:center">
+<div style="font-size:28px;font-weight:700;color:var(--accent)" id="securityScore">A</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">安全评分</div>
+</div>
+</div>
+<button class="btn btn-primary" onclick="loadSecurityStatus()">🔄 刷新状态</button>
+</div>
+<div class="settings-section">
+<h4><span>🚫</span> IP 封禁管理</h4>
+<div class="form-group"><label>解封 IP</label><div style="display:flex;gap:8px"><input type="text" id="unblockIpInput" placeholder="192.168.1.1"><button class="btn btn-ghost" onclick="unblockIP()">解封</button></div></div>
+</div>
+<div class="settings-section">
+<h4><span>🔐</span> 安全设置</h4>
+<div class="setting-row"><div class="setting-row-label">强制密码复杂度<br><small style="color:var(--text2)">要求密码包含大小写、数字和特殊字符</small></div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">登录失败锁定<br><small style="color:var(--text2)">5次失败后锁定1小时</small></div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">会话超时<br><small style="color:var(--text2)">30天无活动自动登出</small></div><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div>
+</div>
+</div></div></div></div>
+<!-- 系统监控页 -->
+<div id="page-monitoring" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>📊</span> 系统监控</h4>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px">
+<div style="padding:20px;background:var(--bg);border-radius:12px;text-align:center">
+<div style="font-size:28px;font-weight:700;color:var(--accent)" id="cpuUsage">0%</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">CPU 使用率</div>
+</div>
+<div style="padding:20px;background:var(--bg);border-radius:12px;text-align:center">
+<div style="font-size:28px;font-weight:700;color:var(--success)" id="memoryUsage">0%</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">内存使用率</div>
+</div>
+<div style="padding:20px;background:var(--bg);border-radius:12px;text-align:center">
+<div style="font-size:28px;font-weight:700;color:var(--warning)" id="diskUsage">0%</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">磁盘使用率</div>
+</div>
+<div style="padding:20px;background:var(--bg);border-radius:12px;text-align:center">
+<div style="font-size:28px;font-weight:700;color:var(--text)" id="uptimeDisplay">0h</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">运行时间</div>
+</div>
+</div>
+<button class="btn btn-primary" onclick="loadSystemMetrics()">🔄 刷新指标</button>
+</div>
+<div class="settings-section">
+<h4><span>📈</span> 性能指标</h4>
+<div id="performanceMetrics" style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px"></div>
+</div>
+<div class="settings-section">
+<h4><span>🔔</span> 告警列表</h4>
+<div id="alertsList" style="max-height:300px;overflow-y:auto"></div>
+</div>
+<div class="settings-section">
+<h4><span>🔗</span> 链路追踪</h4>
+<div id="tracesList" style="max-height:300px;overflow-y:auto"></div>
+</div>
+</div></div></div></div>
+<!-- 任务队列页 -->
+<div id="page-tasks" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>⚙️</span> 任务队列</h4>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px">
+<div style="padding:20px;background:var(--bg);border-radius:12px;text-align:center">
+<div style="font-size:28px;font-weight:700;color:var(--warning)" id="pendingTasks">0</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">待处理</div>
+</div>
+<div style="padding:20px;background:var(--bg);border-radius:12px;text-align:center">
+<div style="font-size:28px;font-weight:700;color:var(--accent)" id="runningTasks">0</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">运行中</div>
+</div>
+<div style="padding:20px;background:var(--bg);border-radius:12px;text-align:center">
+<div style="font-size:28px;font-weight:700;color:var(--success)" id="completedTasks">0</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">已完成</div>
+</div>
+<div style="padding:20px;background:var(--bg);border-radius:12px;text-align:center">
+<div style="font-size:28px;font-weight:700;color:var(--error)" id="failedTasks">0</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">失败</div>
+</div>
+</div>
+<button class="btn btn-primary" onclick="loadTaskQueue()">🔄 刷新队列</button>
+</div>
+<div class="settings-section">
+<h4><span>📋</span> 任务列表</h4>
+<div id="tasksList" style="max-height:400px;overflow-y:auto"></div>
+</div>
+<div class="settings-section">
+<h4><span>⏰</span> 定时任务</h4>
+<div id="scheduledJobs" style="max-height:300px;overflow-y:auto"></div>
 </div>
 </div></div></div></div>
 <!-- MCP页 -->
@@ -1401,7 +1540,7 @@ function showModal(id){$(id).classList.add('show')}
 function setAccent(c){document.documentElement.style.setProperty('--accent',c)}
 function toggleCollapse(el){var content=el.nextElementSibling;content.classList.toggle('show');el.querySelector('span:last-child').textContent=content.classList.contains('show')?'▲':'▼'}
 function api(path,options){options=options||{};var headers=Object.assign({'Content-Type':'application/json'},options.headers||{});if(authToken)headers['Authorization']='Bearer '+authToken;return fetch(path,Object.assign({},options,{headers:headers})).then(function(res){if(!res.ok)return res.json().then(function(e){throw new Error(e.detail||'Error')});return res.json()})}
-document.querySelectorAll('.nav-item[data-page]').forEach(function(n){n.onclick=function(){document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});n.classList.add('active');var page=$('page-'+n.dataset.page);if(page)page.classList.add('active');if(n.dataset.page==='stats')loadStats();if(n.dataset.page==='tokens')loadTokens();if(n.dataset.page==='teams')loadTeams();if(n.dataset.page==='knowledge')loadKnowledgeBases();if(n.dataset.page==='workflows')loadWorkflowTemplates();if(n.dataset.page==='traces')loadTraces();if(n.dataset.page==='integrations')loadFeatureFlags();if(n.dataset.page==='rag')loadRAGKnowledgeBases();if(n.dataset.page==='billing'){loadBillingPlans();loadSubscription();loadUsageStats();loadInvoices()}if(n.dataset.page==='rbac'){loadMyPermissions();loadRoles()}if(n.dataset.page==='local-models')loadOllamaModels();if(n.dataset.page==='workflows')loadAgents();closeMobileMenus()}});
+document.querySelectorAll('.nav-item[data-page]').forEach(function(n){n.onclick=function(){document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});n.classList.add('active');var page=$('page-'+n.dataset.page);if(page)page.classList.add('active');if(n.dataset.page==='stats')loadStats();if(n.dataset.page==='tokens')loadTokens();if(n.dataset.page==='teams')loadTeams();if(n.dataset.page==='knowledge')loadKnowledgeBases();if(n.dataset.page==='workflows')loadWorkflowTemplates();if(n.dataset.page==='traces')loadTraces();if(n.dataset.page==='integrations')loadFeatureFlags();if(n.dataset.page==='rag')loadRAGKnowledgeBases();if(n.dataset.page==='billing'){loadBillingPlans();loadSubscription();loadUsageStats();loadInvoices()}if(n.dataset.page==='rbac'){loadMyPermissions();loadRoles()}if(n.dataset.page==='local-models')loadOllamaModels();if(n.dataset.page==='workflows')loadAgents();if(n.dataset.page==='audit')loadAuditLogs();if(n.dataset.page==='security')loadSecurityStatus();if(n.dataset.page==='monitoring'){loadSystemMetrics();loadAlerts();loadTraces()}if(n.dataset.page==='tasks')loadTaskQueue();closeMobileMenus()}});
 function showAuthModal(){isRegisterMode=false;updateAuthUI();showModal('authModal')}
 function toggleAuthMode(){isRegisterMode=!isRegisterMode;updateAuthUI()}
 function updateAuthUI(){$('authTitle').textContent=isRegisterMode?'注册':'登录';$('authSubmit').textContent=isRegisterMode?'注册':'登录';$('authEmailGroup').style.display=isRegisterMode?'block':'none';$('authSwitch').innerHTML=isRegisterMode?'已有账号？<a href="#" onclick="toggleAuthMode()" style="color:var(--accent)">登录</a>':'没有账号？<a href="#" onclick="toggleAuthMode()" style="color:var(--accent)">注册</a>'}
@@ -2023,6 +2162,107 @@ closeModal('agentModal');
 loadAgents();
 showToast('Agent 已创建')
 }).catch(function(e){alert('创建失败: '+e.message)})}
+
+// ========== 系统监控 ==========
+function loadSystemMetrics(){
+api('/api/system/metrics').then(function(data){
+$('cpuUsage').textContent=data.cpu_percent+'%';
+$('cpuUsage').style.color=data.cpu_percent>80?'var(--error)':data.cpu_percent>50?'var(--warning)':'var(--success)';
+$('memoryUsage').textContent=data.memory_percent+'%';
+$('memoryUsage').style.color=data.memory_percent>80?'var(--error)':data.memory_percent>50?'var(--warning)':'var(--success)';
+$('diskUsage').textContent=data.disk_percent+'%';
+$('diskUsage').style.color=data.disk_percent>80?'var(--error)':data.disk_percent>50?'var(--warning)':'var(--success)';
+var hours=Math.floor(data.uptime/3600);
+var days=Math.floor(hours/24);
+$('uptimeDisplay').textContent=days>0?days+'d '+hours%24+'h':hours+'h';
+// 性能指标
+var perfHtml='';
+if(data.performance){
+for(var name in data.performance){
+var p=data.performance[name];
+perfHtml+='<div style="padding:12px;background:var(--bg);border-radius:8px"><div style="font-weight:500;margin-bottom:8px">'+name+'</div>';
+perfHtml+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px">';
+perfHtml+='<div>平均: <span style="color:var(--accent)">'+p.avg_ms.toFixed(1)+'ms</span></div>';
+perfHtml+='<div>P99: <span style="color:var(--warning)">'+p.p99_ms.toFixed(1)+'ms</span></div>';
+perfHtml+='<div>调用: <span style="color:var(--text2)">'+p.count+'</span></div>';
+perfHtml+='</div></div>'
+}
+}
+$('performanceMetrics').innerHTML=perfHtml||'<p style="color:var(--text2);text-align:center">暂无性能数据</p>'
+}).catch(function(e){console.error('加载系统指标失败:',e)})}
+
+function loadAlerts(){
+api('/api/system/alerts').then(function(data){
+if(data.length===0){$('alertsList').innerHTML='<p style="color:var(--text2);text-align:center;padding:20px">暂无告警</p>';return}
+var html=data.map(function(alert){
+var color=alert.severity==='critical'?'var(--error)':alert.severity==='warning'?'var(--warning)':'var(--text2)';
+return'<div style="padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px;border-left:4px solid '+color+'"><div style="display:flex;justify-content:space-between"><span style="font-weight:500">'+alert.name+'</span><span style="font-size:12px;color:var(--text2)">'+alert.timestamp.slice(11,19)+'</span></div><div style="font-size:13px;color:var(--text2);margin-top:4px">'+alert.message+'</div></div>'
+}).join('');
+$('alertsList').innerHTML=html
+}).catch(function(e){$('alertsList').innerHTML='<p style="color:var(--error)">加载失败</p>'})}
+
+function loadTraces(){
+api('/api/system/traces?limit=20').then(function(data){
+if(data.length===0){$('tracesList').innerHTML='<p style="color:var(--text2);text-align:center;padding:20px">暂无追踪数据</p>';return}
+var html=data.map(function(trace){
+var color=trace.status==='OK'?'var(--success)':'var(--error)';
+var duration=(trace.duration/1000).toFixed(2);
+return'<div style="padding:10px;background:var(--bg);border-radius:8px;margin-bottom:6px;font-size:13px"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:500">'+trace.operationName+'</span><span style="color:'+color+'">'+duration+'ms</span></div><div style="font-size:11px;color:var(--text2);margin-top:4px">TraceID: '+trace.traceId.slice(0,8)+'...</div></div>'
+}).join('');
+$('tracesList').innerHTML=html
+}).catch(function(e){$('tracesList').innerHTML='<p style="color:var(--error)">加载失败</p>'})}
+
+// ========== 任务队列 ==========
+function loadTaskQueue(){
+api('/api/tasks/stats').then(function(data){
+$('pendingTasks').textContent=data.by_status.pending||0;
+$('runningTasks').textContent=data.by_status.running||0;
+$('completedTasks').textContent=data.by_status.completed||0;
+$('failedTasks').textContent=data.by_status.failed||0;
+loadTasksList();
+loadScheduledJobs()
+}).catch(function(e){console.error('加载任务统计失败:',e)})}
+
+function loadTasksList(){
+api('/api/tasks?limit=50').then(function(data){
+if(data.length===0){$('tasksList').innerHTML='<p style="color:var(--text2);text-align:center;padding:20px">暂无任务</p>';return}
+var html=data.map(function(task){
+var statusColors={pending:'var(--warning)',running:'var(--accent)',completed:'var(--success)',failed:'var(--error)',retrying:'var(--warning)'};
+var color=statusColors[task.status]||'var(--text2)';
+return'<div style="padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:500">'+task.name+'</span><span style="padding:2px 8px;background:'+color+';color:#fff;border-radius:4px;font-size:11px">'+task.status+'</span></div><div style="font-size:12px;color:var(--text2);margin-top:6px">ID: '+task.id.slice(0,8)+'... | 创建: '+task.created_at.slice(11,19)+(task.duration_ms?' | 耗时: '+task.duration_ms+'ms':'')+'</div>'+(task.error?'<div style="font-size:12px;color:var(--error);margin-top:4px">错误: '+task.error+'</div>':'')+'</div>'
+}).join('');
+$('tasksList').innerHTML=html
+}).catch(function(e){$('tasksList').innerHTML='<p style="color:var(--error)">加载失败</p>'})}
+
+function loadScheduledJobs(){
+api('/api/tasks/scheduled').then(function(data){
+if(data.length===0){$('scheduledJobs').innerHTML='<p style="color:var(--text2);text-align:center;padding:20px">暂无定时任务</p>';return}
+var html=data.map(function(job){
+return'<div style="padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:500">'+job.name+'</span><span style="font-size:12px;color:var(--text2)">间隔: '+(job.interval/60)+'分钟</span></div><div style="font-size:12px;color:var(--text2);margin-top:6px">执行次数: '+job.run_count+' | 错误: '+job.errors+(job.last_run?' | 上次: '+job.last_run.slice(11,19):'')+'</div></div>'
+}).join('');
+$('scheduledJobs').innerHTML=html
+}).catch(function(e){$('scheduledJobs').innerHTML='<p style="color:var(--error)">加载失败</p>'})}
+
+// ========== 安全中心 ==========
+function loadSecurityStatus(){
+api('/api/security/status').then(function(data){
+$('blockedIpsCount').textContent=data.blocked_ips||0;
+$('failedAttemptsCount').textContent=data.failed_attempts_tracked||0;
+$('twoFaUsersCount').textContent=data['2fa_enabled_users']||0;
+var score=data.blocked_ips===0&&data.failed_attempts_tracked<10?'A':'B';
+$('securityScore').textContent=score;
+$('securityScore').style.color=score==='A'?'var(--success)':'var(--warning)'
+}).catch(function(e){console.error('加载安全状态失败:',e)})}
+
+function unblockIP(){
+var ip=$('unblockIpInput').value.trim();
+if(!ip){alert('请输入IP地址');return}
+if(!confirm('确定解封 '+ip+'？'))return;
+api('/api/security/unblock-ip',{method:'POST',body:JSON.stringify({ip:ip})}).then(function(){
+showToast('IP已解封');
+$('unblockIpInput').value='';
+loadSecurityStatus()
+}).catch(function(e){alert('解封失败: '+e.message)})}
 
 // ========== 本地模型 (Ollama) ==========
 function loadOllamaModels(){

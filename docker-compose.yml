@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # 主应用
   api-gateway:
     build: .
     container_name: ai-hub
@@ -10,9 +11,15 @@ services:
       - .env
     environment:
       - LOG_LEVEL=INFO
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://aihub:aihub@postgres:5432/aihub
     volumes:
       - ./data.db:/app/data.db
       - ./app.log:/app/app.log
+      - ./backups:/app/backups
+      - ./tenant_data:/app/tenant_data
+    depends_on:
+      - redis
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -24,12 +31,158 @@ services:
       resources:
         limits:
           cpus: '2'
-          memory: 1G
+          memory: 2G
         reservations:
           cpus: '0.5'
-          memory: 256M
+          memory: 512M
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: "50m"
+        max-file: "5"
+    networks:
+      - aihub-network
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: ai-hub-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - aihub-network
+
+  # PostgreSQL 数据库（生产环境可选）
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-hub-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: aihub
+      POSTGRES_PASSWORD: aihub
+      POSTGRES_DB: aihub
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aihub"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - aihub-network
+    profiles:
+      - production
+
+  # Milvus 向量数据库（RAG 可选）
+  milvus:
+    image: milvusdb/milvus:v2.3-latest
+    container_name: ai-hub-milvus
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - milvus-data:/var/lib/milvus
+    depends_on:
+      - etcd
+      - minio
+    restart: unless-stopped
+    networks:
+      - aihub-network
+    profiles:
+      - rag
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    container_name: ai-hub-etcd
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+    volumes:
+      - etcd-data:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    networks:
+      - aihub-network
+    profiles:
+      - rag
+
+  minio:
+    image: minio/minio:latest
+    container_name: ai-hub-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    volumes:
+      - minio-data:/data
+    command: minio server /data --console-address ":9001"
+    networks:
+      - aihub-network
+    profiles:
+      - rag
+
+  # Prometheus 监控
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ai-hub-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - aihub-network
+    profiles:
+      - monitoring
+
+  # Grafana 可视化
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ai-hub-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - aihub-network
+    profiles:
+      - monitoring
+
+networks:
+  aihub-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  postgres-data:
+  milvus-data:
+  etcd-data:
+  minio-data:
+  prometheus-data:
+  grafana-data:

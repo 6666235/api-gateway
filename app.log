@@ -10,3 +10,56 @@
 2025-12-10 23:35:28,964 - WARNING - [__main__] Redis not available, using memory cache: No module named 'redis'
 2025-12-10 23:35:29,025 - INFO - [__main__] Task queue started
 2025-12-10 23:35:29,025 - INFO - [__main__] AI Hub started successfully
+2025-12-11 00:33:10,998 - INFO - [__main__] AI Hub starting...
+2025-12-11 00:33:11,088 - INFO - [__main__] Extended database tables initialized
+2025-12-11 00:33:37,712 - INFO - [__main__] AI Hub starting...
+2025-12-11 00:33:37,716 - INFO - [__main__] Extended database tables initialized
+2025-12-11 00:33:38,009 - WARNING - [__main__] Redis not available, using memory cache: No module named 'redis'
+2025-12-11 00:33:38,095 - ERROR - [__main__] ❌ 扩展模块加载失败: table billing_plans has no column named billing_cycle
+2025-12-11 00:33:38,168 - INFO - [__main__] Task queue started
+2025-12-11 00:33:38,168 - INFO - [__main__] AI Hub started successfully
+2025-12-11 00:35:01,202 - INFO - [__main__] AI Hub starting...
+2025-12-11 00:35:01,207 - INFO - [__main__] Extended database tables initialized
+2025-12-11 00:35:01,350 - WARNING - [__main__] Redis not available, using memory cache: No module named 'redis'
+2025-12-11 00:35:01,369 - ERROR - [__main__] ❌ 扩展模块加载失败: table billing_plans has no column named billing_cycle
+2025-12-11 00:35:01,433 - INFO - [__main__] Task queue started
+2025-12-11 00:35:01,434 - INFO - [__main__] AI Hub started successfully
+2025-12-11 00:36:21,409 - INFO - [__main__] AI Hub starting...
+2025-12-11 00:36:21,413 - INFO - [__main__] Extended database tables initialized
+2025-12-11 00:36:25,650 - WARNING - [__main__] Redis not available, using memory cache: Error 10061 connecting to localhost:6379. 由于目标计算机积极拒绝，无法连接。.
+2025-12-11 00:36:25,808 - WARNING - [__main__] ⚠️ 扩展模块未加载: cannot import name 'CollaborationRole' from 'modules.rbac' (D:\新建文件夹\api-gateway\modules\rbac.py)
+2025-12-11 00:36:25,872 - INFO - [__main__] Task queue started
+2025-12-11 00:36:25,873 - INFO - [__main__] AI Hub started successfully
+2025-12-11 00:38:22,790 - INFO - [__main__] AI Hub starting...
+2025-12-11 00:38:22,793 - INFO - [__main__] Extended database tables initialized
+2025-12-11 00:38:27,033 - WARNING - [__main__] Redis not available, using memory cache: Error 10061 connecting to localhost:6379. 由于目标计算机积极拒绝，无法连接。.
+2025-12-11 00:38:27,079 - INFO - [__main__] ✅ 扩展模块已加载: RBAC, 计费, RAG, 协作, 安全, 企业功能
+2025-12-11 00:38:27,136 - INFO - [__main__] Task queue started
+2025-12-11 00:38:27,136 - INFO - [__main__] AI Hub started successfully
+2025-12-11 00:39:49,569 - INFO - [__main__] AI Hub starting...
+2025-12-11 00:39:49,572 - INFO - [__main__] Extended database tables initialized
+2025-12-11 00:39:53,831 - INFO - [__main__] ℹ️ Redis 服务未运行，使用内存缓存（功能正常）
+2025-12-11 00:39:53,875 - INFO - [__main__] ✅ 扩展模块已加载: RBAC, 计费, RAG, 协作, 安全, 企业功能
+2025-12-11 00:39:53,933 - INFO - [__main__] Task queue started
+2025-12-11 00:39:53,934 - INFO - [__main__] AI Hub started successfully
+2025-12-11 00:41:54,570 - INFO - [__main__] AI Hub starting...
+2025-12-11 00:41:54,574 - INFO - [__main__] Extended database tables initialized
+2025-12-11 00:41:58,852 - INFO - [__main__] ✅ 使用 FakeRedis 内存缓存（功能完整）
+2025-12-11 00:41:58,900 - INFO - [__main__] ✅ 扩展模块已加载: RBAC, 计费, RAG, 协作, 安全, 企业功能
+2025-12-11 00:41:58,964 - INFO - [__main__] Task queue started
+2025-12-11 00:41:58,965 - INFO - [__main__] AI Hub started successfully
+2025-12-11 00:42:24,122 - WARNING - [__main__] Request failed: {"request_id": "7505d391756606bc", "method": "GET", "path": "/static/icon-192.png", "status": 404, "duration_ms": 4.0, "client_ip": "127.0.0.1"}
+2025-12-11 00:43:15,449 - WARNING - [__main__] Slow request: {"request_id": "5747aeb2854e6749", "method": "GET", "path": "/api/ollama/models", "status": 200, "duration_ms": 3296.23, "client_ip": "127.0.0.1"}
+2025-12-11 00:44:21,236 - WARNING - [__main__] Request failed: {"request_id": "d0e3491a7b45caff", "method": "GET", "path": "/static/icon-192.png", "status": 404, "duration_ms": 2.07, "client_ip": "127.0.0.1"}
+2025-12-11 00:44:28,078 - WARNING - [__main__] Request failed: {"request_id": "9a0fad38c4c3761e", "method": "GET", "path": "/api/auth/github", "status": 500, "duration_ms": 3.0, "client_ip": "127.0.0.1"}
+2025-12-11 00:44:32,273 - WARNING - [__main__] Request failed: {"request_id": "f4d174cff6346876", "method": "GET", "path": "/static/icon-192.png", "status": 404, "duration_ms": 3.0, "client_ip": "127.0.0.1"}
+2025-12-11 00:44:34,240 - WARNING - [__main__] Request failed: {"request_id": "c75fd99754f71259", "method": "GET", "path": "/api/auth/github", "status": 500, "duration_ms": 1.01, "client_ip": "127.0.0.1"}
+2025-12-11 00:44:42,265 - WARNING - [__main__] Request failed: {"request_id": "2e1ac9249d999e66", "method": "GET", "path": "/static/icon-192.png", "status": 404, "duration_ms": 2.0, "client_ip": "127.0.0.1"}
+2025-12-11 00:44:46,869 - WARNING - [__main__] Request failed: {"request_id": "d797de10fcab2695", "method": "GET", "path": "/api/billing/subscription", "status": 401, "duration_ms": 2.77, "client_ip": "127.0.0.1"}
+2025-12-11 00:44:46,878 - WARNING - [__main__] Request failed: {"request_id": "aac1ed9cee3b1aae", "method": "GET", "path": "/api/billing/usage", "status": 401, "duration_ms": 2.42, "client_ip": "127.0.0.1"}
+2025-12-11 00:44:46,886 - WARNING - [__main__] Request failed: {"request_id": "993a152220fc66f0", "method": "GET", "path": "/api/billing/invoices", "status": 401, "duration_ms": 4.0, "client_ip": "127.0.0.1"}
+2025-12-11 00:44:48,529 - WARNING - [__main__] Request failed: {"request_id": "5766936a3e43a751", "method": "GET", "path": "/api/billing/subscription", "status": 401, "duration_ms": 6.0, "client_ip": "127.0.0.1"}
+2025-12-11 00:44:48,530 - WARNING - [__main__] Request failed: {"request_id": "3feaf56f8ee483ef", "method": "GET", "path": "/api/billing/usage", "status": 401, "duration_ms": 6.01, "client_ip": "127.0.0.1"}
+2025-12-11 00:44:48,532 - WARNING - [__main__] Request failed: {"request_id": "4f37acade465b12b", "method": "GET", "path": "/api/billing/invoices", "status": 401, "duration_ms": 7.03, "client_ip": "127.0.0.1"}
+2025-12-11 00:45:04,933 - WARNING - [__main__] Request failed: {"request_id": "7529bfc5f9bd98b2", "method": "GET", "path": "/static/icon-192.png", "status": 404, "duration_ms": 3.0, "client_ip": "127.0.0.1"}
+2025-12-11 00:45:21,949 - WARNING - [__main__] Slow request: {"request_id": "6bc3364af4908eff", "method": "GET", "path": "/api/ollama/models", "status": 200, "duration_ms": 3094.77, "client_ip": "127.0.0.1"}

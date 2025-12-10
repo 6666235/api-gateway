@@ -176,12 +176,79 @@ curl http://localhost:8000/v1/chat/completions \
 
 | 类别 | 技术 |
 |------|------|
-| 后端 | FastAPI + SQLite |
+| 后端 | FastAPI + SQLite/PostgreSQL |
 | 前端 | 原生 HTML/CSS/JS |
 | 实时通信 | WebSocket + SSE |
 | 缓存 | Redis（可选） |
+| 向量检索 | 本地/Pinecone/Milvus |
 | 监控 | Prometheus + 自定义链路追踪 |
-| 安全 | TOTP 2FA + API Key 加密 |
+| 安全 | WAF + TOTP 2FA + API Key 加密 |
+| 企业 | LDAP/AD + 多租户 + RBAC |
+
+## 🆕 v2.0 新增功能
+
+### 🔍 RAG 向量检索
+```python
+# 索引文档
+POST /api/rag/index
+{"kb_id": 1, "content": "文档内容...", "metadata": {"source": "file.pdf"}}
+
+# 语义搜索
+POST /api/rag/search
+{"kb_id": 1, "query": "如何使用?", "top_k": 5}
+
+# RAG 查询（返回上下文）
+POST /api/rag/query
+{"kb_id": 1, "question": "产品有什么功能?"}
+```
+
+### 🔐 RBAC 权限控制
+```python
+# 获取用户权限
+GET /api/rbac/users/{user_id}/permissions
+
+# 分配角色
+POST /api/rbac/users/{user_id}/roles
+{"role": "vip"}
+
+# 检查权限
+GET /api/rbac/check?permission=rag
+```
+
+### 💰 计费系统
+```python
+# 获取套餐
+GET /api/billing/plans
+
+# 订阅套餐
+POST /api/billing/subscribe
+{"plan_id": "pro", "payment_provider": "alipay"}
+
+# 获取用量
+GET /api/billing/usage?days=30
+```
+
+### 👥 实时协作
+```python
+# 创建协作会话
+POST /api/collaboration/sessions
+{"conversation_id": "conv_xxx"}
+
+# WebSocket 连接
+ws://localhost:8000/ws/collaboration/{session_id}?user_id=1&username=test
+```
+
+### 🛡️ 安全加固
+- WAF 防护（SQL注入、XSS、命令注入检测）
+- AI 攻击检测（Prompt Injection 防护）
+- 密钥自动轮换
+- 安全审计日志
+
+### 🏢 企业功能
+- LDAP/AD 集成
+- 多租户支持
+- 数据隔离
+- GDPR 合规
 
 ## 📁 项目结构
 

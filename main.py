@@ -4432,6 +4432,521 @@ async def toggle_plugin(plugin_id: str, user=Depends(get_current_user)):
     
     raise HTTPException(status_code=404, detail="插件未安装")
 
+# ========== 多租户系统 ==========
+class TenantManager:
+    """多租户管理"""
+    
+    def __init__(self):
+        self._init_tables()
+    
+    def _init_tables(self):
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.executescript('''
+                CREATE TABLE IF NOT EXISTS tenants (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    domain TEXT UNIQUE,
+                    config TEXT DEFAULT '{}',
+                    status TEXT DEFAULT 'active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                CREATE TABLE IF NOT EXISTS tenant_users (
+                    tenant_id TEXT,
+                    user_id INTEGER,
+                    role TEXT DEFAULT 'member',
+                    PRIMARY KEY (tenant_id, user_id),
+                    FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                );
+                
+                CREATE TABLE IF NOT EXISTS tenant_quotas (
+                    tenant_id TEXT PRIMARY KEY,
+                    tokens_limit INTEGER DEFAULT 1000000,
+                    tokens_used INTEGER DEFAULT 0,
+                    users_limit INTEGER DEFAULT 100,
+                    storage_limit INTEGER DEFAULT 10737418240,
+                    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+                );
+            ''')
+    
+    def create_tenant(self, name: str, domain: str = None) -> str:
+        tenant_id = f"tenant_{secrets.token_hex(8)}"
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(
+                "INSERT INTO tenants (id, name, domain) VALUES (?, ?, ?)",
+                (tenant_id, name, domain)
+            )
+            conn.execute(
+                "INSERT INTO tenant_quotas (tenant_id) VALUES (?)",
+                (tenant_id,)
+            )
+        return tenant_id
+    
+    def get_tenant(self, tenant_id: str) -> dict:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM tenants WHERE id = ?", (tenant_id,)).fetchone()
+            return dict(row) if row else None
+    
+    def get_tenant_by_domain(self, domain: str) -> dict:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM tenants WHERE domain = ?", (domain,)).fetchone()
+            return dict(row) if row else None
+    
+    def add_user_to_tenant(self, tenant_id: str, user_id: int, role: str = "member"):
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO tenant_users (tenant_id, user_id, role) VALUES (?, ?, ?)",
+                (tenant_id, user_id, role)
+            )
+    
+    def get_user_tenant(self, user_id: int) -> dict:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("""
+                SELECT t.*, tu.role as user_role FROM tenants t
+                JOIN tenant_users tu ON t.id = tu.tenant_id
+                WHERE tu.user_id = ?
+            """, (user_id,)).fetchone()
+            return dict(row) if row else None
+    
+    def check_quota(self, tenant_id: str, quota_type: str) -> tuple:
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute("SELECT * FROM tenant_quotas WHERE tenant_id = ?", (tenant_id,)).fetchone()
+            if not row:
+                return True, -1
+            
+            if quota_type == "tokens":
+                return row[2] < row[1], row[1] - row[2]  # used < limit
+            elif quota_type == "users":
+                count = conn.execute(
+                    "SELECT COUNT(*) FROM tenant_users WHERE tenant_id = ?", (tenant_id,)
+                ).fetchone()[0]
+                return count < row[3], row[3] - count
+            
+            return True, -1
+
+tenant_manager = TenantManager()
+
+@app.post("/api/tenants")
+async def create_tenant(data: dict, user=Depends(get_current_user)):
+    """创建租户"""
+    if not user or not rbac.has_permission(user["id"], "admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    
+    name = data.get("name")
+    domain = data.get("domain")
+    
+    tenant_id = tenant_manager.create_tenant(name, domain)
+    return {"success": True, "tenant_id": tenant_id}
+
+@app.get("/api/tenants")
+async def list_tenants(user=Depends(get_current_user)):
+    """获取租户列表"""
+    if not user or not rbac.has_permission(user["id"], "admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM tenants").fetchall()
+        return [dict(r) for r in rows]
+
+@app.get("/api/tenants/my")
+async def get_my_tenant(user=Depends(get_current_user)):
+    """获取当前用户的租户"""
+    if not user:
+        return None
+    return tenant_manager.get_user_tenant(user["id"])
+
+# ========== 审计合规 ==========
+class AuditLogger:
+    """审计日志记录器"""
+    
+    AUDIT_EVENTS = [
+        "user.login", "user.logout", "user.register",
+        "data.export", "data.delete", "data.access",
+        "settings.change", "permission.change",
+        "payment.create", "payment.complete",
+        "api.call", "security.alert"
+    ]
+    
+    def log(self, user_id: int, event: str, resource: str, details: dict, ip: str = None):
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("""
+                INSERT INTO audit_logs (user_id, action, resource, details, ip_address)
+                VALUES (?, ?, ?, ?, ?)
+            """, (user_id, event, resource, json.dumps(details, ensure_ascii=False), ip))
+    
+    def get_logs(self, user_id: int = None, event: str = None, days: int = 30, limit: int = 100) -> list:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            query = "SELECT * FROM audit_logs WHERE created_at >= date('now', ?)"
+            params = [f'-{days} days']
+            
+            if user_id:
+                query += " AND user_id = ?"
+                params.append(user_id)
+            
+            if event:
+                query += " AND action = ?"
+                params.append(event)
+            
+            query += " ORDER BY created_at DESC LIMIT ?"
+            params.append(limit)
+            
+            rows = conn.execute(query, params).fetchall()
+            return [dict(r) for r in rows]
+    
+    def generate_compliance_report(self, tenant_id: str = None, period: str = "month") -> dict:
+        """生成合规报告"""
+        with sqlite3.connect(DB_PATH) as conn:
+            if period == "month":
+                date_filter = "date('now', 'start of month')"
+            elif period == "quarter":
+                date_filter = "date('now', '-3 months')"
+            else:
+                date_filter = "date('now', '-1 year')"
+            
+            # 统计各类事件
+            events = conn.execute(f"""
+                SELECT action, COUNT(*) as count FROM audit_logs
+                WHERE created_at >= {date_filter}
+                GROUP BY action
+            """).fetchall()
+            
+            # 安全事件
+            security_events = conn.execute(f"""
+                SELECT * FROM audit_logs
+                WHERE action = 'security.alert' AND created_at >= {date_filter}
+            """).fetchall()
+            
+            # 数据访问统计
+            data_access = conn.execute(f"""
+                SELECT user_id, COUNT(*) as count FROM audit_logs
+                WHERE action LIKE 'data.%' AND created_at >= {date_filter}
+                GROUP BY user_id
+            """).fetchall()
+            
+            return {
+                "period": period,
+                "generated_at": datetime.now().isoformat(),
+                "event_summary": {e[0]: e[1] for e in events},
+                "security_alerts": len(security_events),
+                "data_access_users": len(data_access),
+                "compliance_status": "compliant" if len(security_events) == 0 else "review_required"
+            }
+
+audit_logger = AuditLogger()
+
+@app.get("/api/audit/logs")
+async def get_audit_logs(days: int = 30, event: str = None, user=Depends(get_current_user)):
+    """获取审计日志"""
+    if not user or not rbac.has_permission(user["id"], "admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    
+    logs = audit_logger.get_logs(event=event, days=days)
+    return logs
+
+@app.get("/api/audit/report")
+async def get_compliance_report(period: str = "month", user=Depends(get_current_user)):
+    """获取合规报告"""
+    if not user or not rbac.has_permission(user["id"], "admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    
+    return audit_logger.generate_compliance_report(period=period)
+
+@app.post("/api/audit/export")
+async def export_audit_logs(data: dict, user=Depends(get_current_user)):
+    """导出审计日志"""
+    if not user or not rbac.has_permission(user["id"], "admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    
+    days = data.get("days", 30)
+    format_type = data.get("format", "json")
+    
+    logs = audit_logger.get_logs(days=days, limit=10000)
+    
+    # 记录导出操作
+    audit_logger.log(user["id"], "data.export", "audit_logs", {"days": days, "count": len(logs)})
+    
+    if format_type == "csv":
+        import csv
+        import io
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=["id", "user_id", "action", "resource", "details", "ip_address", "created_at"])
+        writer.writeheader()
+        writer.writerows(logs)
+        return {"content": output.getvalue(), "filename": f"audit_logs_{datetime.now().strftime('%Y%m%d')}.csv"}
+    
+    return {"logs": logs, "count": len(logs)}
+
+# ========== 支付集成 ==========
+class PaymentGateway:
+    """支付网关"""
+    
+    def __init__(self):
+        self.alipay_app_id = os.getenv("ALIPAY_APP_ID", "")
+        self.wechat_app_id = os.getenv("WECHAT_APP_ID", "")
+        self.stripe_key = os.getenv("STRIPE_SECRET_KEY", "")
+    
+    async def create_alipay_order(self, order_id: str, amount: float, subject: str) -> dict:
+        """创建支付宝订单"""
+        if not self.alipay_app_id:
+            return {"success": False, "error": "支付宝未配置"}
+        
+        # 实际实现需要使用 alipay-sdk
+        # 这里返回模拟数据
+        return {
+            "success": True,
+            "order_id": order_id,
+            "pay_url": f"https://openapi.alipay.com/gateway.do?order={order_id}",
+            "qr_code": f"https://qr.alipay.com/{order_id}"
+        }
+    
+    async def create_wechat_order(self, order_id: str, amount: float, subject: str) -> dict:
+        """创建微信支付订单"""
+        if not self.wechat_app_id:
+            return {"success": False, "error": "微信支付未配置"}
+        
+        # 实际实现需要使用 wechatpay-python
+        return {
+            "success": True,
+            "order_id": order_id,
+            "prepay_id": f"wx_{secrets.token_hex(16)}",
+            "qr_code": f"weixin://wxpay/bizpayurl?pr={order_id}"
+        }
+    
+    async def create_stripe_order(self, order_id: str, amount: float, currency: str = "usd") -> dict:
+        """创建 Stripe 订单"""
+        if not self.stripe_key:
+            return {"success": False, "error": "Stripe 未配置"}
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.stripe.com/v1/checkout/sessions",
+                    auth=(self.stripe_key, ""),
+                    data={
+                        "payment_method_types[]": "card",
+                        "line_items[0][price_data][currency]": currency,
+                        "line_items[0][price_data][unit_amount]": int(amount * 100),
+                        "line_items[0][price_data][product_data][name]": "AI Hub Subscription",
+                        "line_items[0][quantity]": 1,
+                        "mode": "payment",
+                        "success_url": f"http://localhost:8000/payment/success?order={order_id}",
+                        "cancel_url": f"http://localhost:8000/payment/cancel?order={order_id}"
+                    }
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    return {"success": True, "order_id": order_id, "checkout_url": data.get("url")}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+        
+        return {"success": False, "error": "创建订单失败"}
+    
+    async def verify_payment(self, order_id: str, method: str) -> bool:
+        """验证支付状态"""
+        # 实际实现需要查询各支付平台
+        # 这里模拟验证
+        return True
+
+payment_gateway = PaymentGateway()
+
+@app.post("/api/payment/create")
+async def create_payment_order(data: dict, user=Depends(get_current_user)):
+    """创建支付订单"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    method = data.get("method", "alipay")  # alipay, wechat, stripe
+    plan_id = data.get("plan_id")
+    months = data.get("months", 1)
+    
+    # 获取套餐价格
+    with sqlite3.connect(DB_PATH) as conn:
+        plan = conn.execute("SELECT * FROM billing_plans WHERE id = ?", (plan_id,)).fetchone()
+        if not plan:
+            raise HTTPException(status_code=400, detail="套餐不存在")
+        
+        amount = plan[2] * months  # price * months
+    
+    order_id = f"order_{secrets.token_hex(12)}"
+    
+    # 创建订单记录
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""
+            INSERT INTO invoices (id, user_id, amount, status)
+            VALUES (?, ?, ?, 'pending')
+        """, (order_id, user["id"], amount))
+    
+    # 调用支付网关
+    if method == "alipay":
+        result = await payment_gateway.create_alipay_order(order_id, amount, f"AI Hub {plan[1]}")
+    elif method == "wechat":
+        result = await payment_gateway.create_wechat_order(order_id, amount, f"AI Hub {plan[1]}")
+    elif method == "stripe":
+        result = await payment_gateway.create_stripe_order(order_id, amount)
+    else:
+        raise HTTPException(status_code=400, detail="不支持的支付方式")
+    
+    # 记录审计日志
+    audit_logger.log(user["id"], "payment.create", order_id, {"method": method, "amount": amount})
+    
+    return result
+
+@app.post("/api/payment/callback/{method}")
+async def payment_callback(method: str, request: Request):
+    """支付回调"""
+    body = await request.body()
+    
+    # 验证签名（实际实现需要各平台的签名验证）
+    # ...
+    
+    # 解析订单信息
+    if method == "alipay":
+        form = await request.form()
+        order_id = form.get("out_trade_no")
+        status = form.get("trade_status")
+    elif method == "wechat":
+        # 解析 XML
+        order_id = "..."
+        status = "SUCCESS"
+    elif method == "stripe":
+        data = await request.json()
+        order_id = data.get("data", {}).get("object", {}).get("metadata", {}).get("order_id")
+        status = "SUCCESS"
+    else:
+        return {"success": False}
+    
+    if status in ["TRADE_SUCCESS", "SUCCESS"]:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("UPDATE invoices SET status = 'paid', paid_at = ? WHERE id = ?", (datetime.now(), order_id))
+            
+            # 获取用户并激活订阅
+            invoice = conn.execute("SELECT user_id FROM invoices WHERE id = ?", (order_id,)).fetchone()
+            if invoice:
+                audit_logger.log(invoice[0], "payment.complete", order_id, {"method": method})
+    
+    return {"success": True}
+
+# ========== 安全加固 ==========
+class SecurityManager:
+    """安全管理器"""
+    
+    def __init__(self):
+        self.blocked_ips = set()
+        self.failed_attempts = defaultdict(list)
+        self.max_failed_attempts = 5
+        self.block_duration = 3600  # 1小时
+    
+    def check_ip(self, ip: str) -> bool:
+        """检查 IP 是否被封禁"""
+        if ip in self.blocked_ips:
+            return False
+        
+        # 清理过期的失败记录
+        now = time.time()
+        self.failed_attempts[ip] = [t for t in self.failed_attempts[ip] if now - t < self.block_duration]
+        
+        return len(self.failed_attempts[ip]) < self.max_failed_attempts
+    
+    def record_failed_attempt(self, ip: str):
+        """记录失败尝试"""
+        self.failed_attempts[ip].append(time.time())
+        
+        if len(self.failed_attempts[ip]) >= self.max_failed_attempts:
+            self.blocked_ips.add(ip)
+            logger.warning(f"IP {ip} blocked due to too many failed attempts")
+    
+    def unblock_ip(self, ip: str):
+        """解封 IP"""
+        self.blocked_ips.discard(ip)
+        self.failed_attempts.pop(ip, None)
+    
+    def validate_password_strength(self, password: str) -> tuple:
+        """验证密码强度"""
+        errors = []
+        
+        if len(password) < 8:
+            errors.append("密码长度至少8位")
+        if not any(c.isupper() for c in password):
+            errors.append("需要包含大写字母")
+        if not any(c.islower() for c in password):
+            errors.append("需要包含小写字母")
+        if not any(c.isdigit() for c in password):
+            errors.append("需要包含数字")
+        if not any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password):
+            errors.append("需要包含特殊字符")
+        
+        return len(errors) == 0, errors
+    
+    def generate_secure_token(self, length: int = 32) -> str:
+        """生成安全令牌"""
+        return secrets.token_urlsafe(length)
+    
+    def hash_sensitive_data(self, data: str) -> str:
+        """哈希敏感数据"""
+        return hashlib.sha256(data.encode()).hexdigest()
+
+security_manager = SecurityManager()
+
+@app.middleware("http")
+async def security_middleware(request: Request, call_next):
+    """安全中间件"""
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # 检查 IP 封禁
+    if not security_manager.check_ip(client_ip):
+        return JSONResponse(
+            status_code=403,
+            content={"error": "IP 已被封禁，请稍后再试"}
+        )
+    
+    # 检查请求头安全
+    user_agent = request.headers.get("user-agent", "")
+    if not user_agent or len(user_agent) < 10:
+        # 可疑请求
+        logger.warning(f"Suspicious request from {client_ip}: missing/short user-agent")
+    
+    response = await call_next(request)
+    
+    # 添加安全响应头
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    
+    return response
+
+@app.get("/api/security/status")
+async def get_security_status(user=Depends(get_current_user)):
+    """获取安全状态"""
+    if not user or not rbac.has_permission(user["id"], "admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    
+    return {
+        "blocked_ips": len(security_manager.blocked_ips),
+        "failed_attempts_tracked": len(security_manager.failed_attempts),
+        "2fa_enabled_users": 0,  # 需要查询数据库
+        "last_security_scan": datetime.now().isoformat()
+    }
+
+@app.post("/api/security/unblock-ip")
+async def unblock_ip(data: dict, user=Depends(get_current_user)):
+    """解封 IP"""
+    if not user or not rbac.has_permission(user["id"], "admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    
+    ip = data.get("ip")
+    security_manager.unblock_ip(ip)
+    audit_logger.log(user["id"], "security.alert", "unblock_ip", {"ip": ip})
+    
+    return {"success": True}
+
 # ========== 静态文件 ==========
 import pathlib
 BASE_DIR = pathlib.Path(__file__).parent.resolve()
@@ -4463,10 +4978,19 @@ class RedisCache:
             redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
             self.redis = redis.from_url(redis_url, decode_responses=True)
             self.redis.ping()
-            logger.info("Redis connected successfully")
-        except Exception as e:
-            logger.warning(f"Redis not available, using memory cache: {e}")
+            logger.info("✅ Redis 缓存已连接")
+        except ImportError:
+            logger.info("ℹ️ Redis 未安装，使用内存缓存")
             self.redis = None
+        except Exception:
+            # 尝试使用 fakeredis（内存模拟）
+            try:
+                import fakeredis
+                self.redis = fakeredis.FakeRedis(decode_responses=True)
+                logger.info("✅ 使用 FakeRedis 内存缓存（功能完整）")
+            except ImportError:
+                logger.info("ℹ️ Redis 服务未运行，使用简单内存缓存")
+                self.redis = None
     
     async def get(self, key: str) -> Optional[str]:
         try:
@@ -4534,8 +5058,40 @@ task_queue = TaskQueue()
 
 @app.on_event("startup")
 async def startup_event():
-    await task_queue.start()
+    import time
+    app.state.start_time = time.time()
+    
+    # 启动任务队列
+    try:
+        await task_queue.start()
+    except Exception as e:
+        logger.warning(f"Task queue start failed: {e}")
+    
+    # 启动定时任务调度器
+    try:
+        from modules.queue import scheduler
+        await scheduler.start()
+    except Exception as e:
+        logger.warning(f"Scheduler start failed: {e}")
+    
     logger.info("AI Hub started successfully")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    # 停止任务队列
+    try:
+        await task_queue.stop()
+    except:
+        pass
+    
+    # 停止调度器
+    try:
+        from modules.queue import scheduler
+        await scheduler.stop()
+    except:
+        pass
+    
+    logger.info("AI Hub shutdown complete")
 
 @app.get("/api/tasks/{task_id}")
 async def get_task_status(task_id: str):
@@ -4789,6 +5345,261 @@ async def batch_export_messages(data: dict, user=Depends(get_current_user)):
 
 # 记录启动时间
 app.state.start_time = time.time()
+
+# ========== 集成扩展模块 ==========
+try:
+    from modules.integration import setup_modules
+    from modules.api_routes import router as extended_router
+    from modules.rbac import rbac
+    from modules.billing import billing
+    from modules.security import waf, ai_detector, auditor
+    from modules.enterprise import tenant_manager, compliance
+    
+    # 注册扩展路由
+    app.include_router(extended_router)
+    
+    # 添加安全检查中间件
+    @app.middleware("http")
+    async def security_check_middleware(request: Request, call_next):
+        # WAF 检查
+        client_ip = request.client.host if request.client else "unknown"
+        if waf.is_ip_blocked(client_ip):
+            return JSONResponse(status_code=403, content={"detail": "IP 已被封禁"})
+        
+        # 检查请求体（仅对 POST/PUT）
+        if request.method in ["POST", "PUT"]:
+            try:
+                body = await request.body()
+                if body:
+                    body_str = body.decode('utf-8', errors='ignore')
+                    waf_result = waf.check(body_str, client_ip)
+                    if waf_result["blocked"]:
+                        auditor.log_event("waf_blocked", "high", ip=client_ip,
+                                         details={"violations": waf_result["violations"]})
+                        return JSONResponse(status_code=403, 
+                                          content={"detail": "请求被安全策略拦截"})
+            except:
+                pass
+        
+        return await call_next(request)
+    
+    logger.info("✅ 扩展模块已加载: RBAC, 计费, RAG, 协作, 安全, 企业功能")
+except ImportError as e:
+    logger.warning(f"⚠️ 扩展模块未加载: {e}")
+except Exception as e:
+    logger.error(f"❌ 扩展模块加载失败: {e}")
+
+# ========== 系统监控 API ==========
+@app.get("/api/system/metrics")
+async def get_system_metrics():
+    """获取系统指标"""
+    import psutil
+    
+    # 基础指标
+    cpu_percent = psutil.cpu_percent(interval=0.1)
+    memory = psutil.virtual_memory()
+    disk = psutil.disk_usage('/')
+    
+    # 计算运行时间
+    import time
+    uptime = time.time() - app.state.start_time if hasattr(app.state, 'start_time') else 0
+    
+    # 性能指标（从监控模块获取）
+    performance = {}
+    try:
+        from modules.monitoring import profiler
+        performance = profiler.get_stats()
+    except:
+        pass
+    
+    return {
+        "cpu_percent": cpu_percent,
+        "memory_percent": memory.percent,
+        "memory_used_gb": round(memory.used / (1024**3), 2),
+        "memory_total_gb": round(memory.total / (1024**3), 2),
+        "disk_percent": disk.percent,
+        "disk_used_gb": round(disk.used / (1024**3), 2),
+        "disk_total_gb": round(disk.total / (1024**3), 2),
+        "uptime": uptime,
+        "performance": performance
+    }
+
+@app.get("/api/system/alerts")
+async def get_system_alerts():
+    """获取系统告警"""
+    try:
+        from modules.monitoring import alert_manager
+        return alert_manager.get_alerts(limit=50)
+    except:
+        return []
+
+@app.get("/api/system/traces")
+async def get_system_traces(limit: int = 20):
+    """获取链路追踪"""
+    try:
+        from modules.monitoring import tracer
+        return tracer.get_traces(limit=limit)
+    except:
+        return []
+
+# ========== 任务队列 API ==========
+@app.get("/api/tasks/stats")
+async def get_task_stats():
+    """获取任务统计"""
+    try:
+        from modules.queue import task_queue
+        return task_queue.get_stats()
+    except:
+        return {"total": 0, "by_status": {}, "workers": 0, "running": False}
+
+@app.get("/api/tasks")
+async def get_tasks(limit: int = 50):
+    """获取任务列表"""
+    try:
+        from modules.queue import task_queue
+        return task_queue.get_tasks(limit=limit)
+    except:
+        return []
+
+@app.get("/api/tasks/scheduled")
+async def get_scheduled_jobs():
+    """获取定时任务"""
+    try:
+        from modules.queue import scheduler
+        return scheduler.get_jobs()
+    except:
+        return []
+
+# ========== 安全 API ==========
+@app.get("/api/security/status")
+async def get_security_status():
+    """获取安全状态"""
+    with sqlite3.connect(DB_PATH) as conn:
+        # 2FA 用户数
+        two_fa_users = conn.execute(
+            "SELECT COUNT(*) FROM users WHERE totp_enabled = 1"
+        ).fetchone()[0]
+        
+        # 失败登录尝试（从审计日志）
+        failed_attempts = conn.execute(
+            "SELECT COUNT(*) FROM audit_logs WHERE action = 'login_failed' AND created_at > datetime('now', '-1 day')"
+        ).fetchone()[0]
+    
+    return {
+        "blocked_ips": len(getattr(rate_limiter, 'blocked_ips', set())),
+        "failed_attempts_tracked": failed_attempts,
+        "2fa_enabled_users": two_fa_users,
+        "security_score": "A" if failed_attempts < 10 else "B"
+    }
+
+@app.post("/api/security/unblock-ip")
+async def unblock_ip(request: Request, user=Depends(get_current_user)):
+    """解封 IP"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    data = await request.json()
+    ip = data.get("ip")
+    
+    if hasattr(rate_limiter, 'blocked_ips'):
+        rate_limiter.blocked_ips.discard(ip)
+    
+    # 记录审计日志
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO audit_logs (user_id, action, resource, details) VALUES (?, ?, ?, ?)",
+            (user["id"], "unblock_ip", "security", json.dumps({"ip": ip}))
+        )
+    
+    return {"success": True}
+
+# ========== 审计日志 API ==========
+@app.get("/api/audit/logs")
+async def get_audit_logs(days: int = 30, event: str = None, user=Depends(get_current_user)):
+    """获取审计日志"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        query = "SELECT * FROM audit_logs WHERE created_at > datetime('now', '-{} days')".format(days)
+        if event:
+            query += f" AND action = '{event}'"
+        query += " ORDER BY created_at DESC LIMIT 200"
+        rows = conn.execute(query).fetchall()
+        return [dict(r) for r in rows]
+
+@app.post("/api/audit/export")
+async def export_audit_logs(request: Request, user=Depends(get_current_user)):
+    """导出审计日志"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    data = await request.json()
+    days = data.get("days", 30)
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM audit_logs WHERE created_at > datetime('now', '-{} days') ORDER BY created_at DESC".format(days)
+        ).fetchall()
+    
+    # 生成 CSV
+    import csv
+    import io
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "用户ID", "操作", "资源", "详情", "IP地址", "时间"])
+    for row in rows:
+        writer.writerow([row["id"], row["user_id"], row["action"], row["resource"], row["details"], row["ip_address"], row["created_at"]])
+    
+    return {
+        "filename": f"audit_logs_{datetime.now().strftime('%Y%m%d')}.csv",
+        "content": output.getvalue()
+    }
+
+@app.get("/api/audit/report")
+async def get_compliance_report(period: str = "monthly", user=Depends(get_current_user)):
+    """生成合规报告"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    days = 30 if period == "monthly" else 7 if period == "weekly" else 1
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        
+        # 事件统计
+        event_stats = conn.execute(
+            "SELECT action, COUNT(*) as count FROM audit_logs WHERE created_at > datetime('now', '-{} days') GROUP BY action".format(days)
+        ).fetchall()
+        
+        # 安全警报
+        security_alerts = conn.execute(
+            "SELECT COUNT(*) FROM audit_logs WHERE action IN ('login_failed', 'unauthorized_access') AND created_at > datetime('now', '-{} days')".format(days)
+        ).fetchone()[0]
+    
+    return {
+        "period": period,
+        "generated_at": datetime.now().isoformat(),
+        "event_summary": {row["action"]: row["count"] for row in event_stats},
+        "security_alerts": security_alerts,
+        "compliance_status": "compliant" if security_alerts < 10 else "review_needed"
+    }
+
+# 挂载静态文件
+from fastapi.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# 根路径重定向到主页
+@app.get("/")
+async def root():
+    return FileResponse("static/index.html")
+
+# 分享页面
+@app.get("/share/{share_id}")
+async def share_page(share_id: str):
+    return FileResponse("static/share.html")
 
 if __name__ == "__main__":
     import uvicorn
