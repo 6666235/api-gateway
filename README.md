@@ -1,9 +1,10 @@
 # 🤖 AI Hub - 企业级统一 AI 平台
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.0.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.1.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/python-3.9+-green.svg" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
+  <img src="https://img.shields.io/badge/features-80+-brightgreen.svg" alt="Features">
 </p>
 
 一站式企业级 AI 对话平台，支持 10+ 模型服务商，包含完整的用户系统、团队协作、付费功能和运维监控。
@@ -254,23 +255,76 @@ ws://localhost:8000/ws/collaboration/{session_id}?user_id=1&username=test
 
 ```
 api-gateway/
-├── main.py              # 主程序
-├── requirements.txt     # Python 依赖
-├── Dockerfile          # Docker 配置
-├── start.bat           # Windows 启动脚本
-├── .env                # 环境变量
+├── main.py                 # 主程序入口
+├── requirements.txt        # Python 依赖
+├── Dockerfile             # Docker 配置
+├── docker-compose.yml     # Docker Compose 编排
+├── start.bat              # Windows 启动脚本
+├── deploy.sh              # Linux 部署脚本
+├── .env                   # 环境变量
+├── modules/               # 功能模块
+│   ├── cache.py          # Redis/内存缓存
+│   ├── monitoring.py     # 监控指标
+│   ├── queue.py          # 任务队列
+│   ├── ai_tools.py       # AI 工具增强
+│   ├── middleware.py     # 中间件
+│   ├── validators.py     # 数据验证
+│   ├── database.py       # 数据库管理
+│   ├── rag.py            # RAG 向量检索
+│   ├── rbac.py           # 权限控制
+│   ├── billing.py        # 计费系统
+│   ├── collaboration.py  # 实时协作
+│   ├── security.py       # 安全模块
+│   ├── enterprise.py     # 企业功能
+│   └── integration.py    # 第三方集成
 ├── static/
-│   ├── index.html      # 主页面
-│   ├── share.html      # 分享页面
-│   ├── manifest.json   # PWA 配置
-│   └── sw.js           # Service Worker
-└── extension/          # 浏览器插件
-    ├── manifest.json
-    ├── background.js
-    ├── content.js
-    ├── popup.html
-    └── popup.js
+│   ├── index.html        # 主页面
+│   ├── share.html        # 分享页面
+│   ├── api-test.html     # API 测试页
+│   ├── manifest.json     # PWA 配置
+│   └── sw.js             # Service Worker
+├── extension/             # 浏览器插件
+│   ├── manifest.json
+│   ├── background.js
+│   ├── content.js
+│   ├── popup.html
+│   └── popup.js
+├── desktop/               # Electron 桌面客户端
+│   ├── main.js
+│   └── package.json
+├── k8s/                   # Kubernetes 配置
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   └── ingress.yaml
+├── tests/                 # 测试文件
+│   ├── test_main.py
+│   └── test_performance.py
+└── .github/workflows/     # CI/CD 配置
+    └── ci.yml
 ```
+
+## 🆕 v2.1 新增优化
+
+### 📦 模块化架构
+- 缓存模块：支持 Redis 分布式缓存和内存缓存自动切换
+- 监控模块：Prometheus 指标、链路追踪、性能分析、告警系统
+- 任务队列：异步任务处理、定时任务调度、任务重试
+- AI 工具：Function Calling 工具注册表、智能助手增强
+- 中间件：请求日志、错误处理、安全检查、速率限制
+- 数据验证：输入验证、XSS 防护、敏感词过滤
+- 数据库管理：连接池、迁移、备份、优化
+
+### 🖥️ 系统监控面板
+- CPU/内存/磁盘实时监控
+- 性能指标可视化
+- 告警列表
+- 链路追踪查看
+
+### ⚙️ 任务队列管理
+- 任务状态统计
+- 任务列表查看
+- 定时任务管理
+- 任务重试机制
 
 ## 🔑 快捷键
 
