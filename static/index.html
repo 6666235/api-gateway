@@ -235,6 +235,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="nav-item" data-page="assistants"><span class="nav-item-icon">🎭</span> 助手</div>
 <div class="nav-item" data-page="providers"><span class="nav-item-icon">📦</span> 模型服务</div>
 <div class="nav-item" data-page="default-model"><span class="nav-item-icon">🎯</span> 默认模型</div>
+<div class="nav-item" data-page="compare"><span class="nav-item-icon">⚖️</span> 模型对比</div>
 </div>
 <div class="nav-divider"></div>
 <div class="nav-section">
@@ -370,6 +371,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="form-group"><label>💻 代码模型<br><small style="color:var(--text2)">用于代码生成和分析的默认模型</small></label><div class="form-row"><select id="defaultCodeProvider" onchange="onDefaultProviderChange('code')" style="flex:1"></select><select id="defaultCodeModel" style="flex:1"></select></div></div>
 <div class="form-group"><label>🚀 快捷助手模型<br><small style="color:var(--text2)">快捷助手使用的默认模型</small></label><div class="form-row"><select id="defaultQuickProvider" onchange="onDefaultProviderChange('quick')" style="flex:1"></select><select id="defaultQuickModel" style="flex:1"></select></div></div>
 <button class="btn btn-primary" onclick="saveDefaultModels()">💾 保存设置</button>
+</div>
+</div></div></div></div>
+<!-- 模型对比页 -->
+<div id="page-compare" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>⚖️</span> 模型对比</h4>
+<p style="color:var(--text2);margin-bottom:20px">同时向多个模型发送相同问题，对比回答质量和速度</p>
+<div class="form-group">
+<label>问题</label>
+<textarea id="compareQuestion" rows="3" placeholder="输入要对比的问题...">请用一句话解释什么是人工智能</textarea>
+</div>
+<div class="form-group">
+<label>选择模型 (最多5个)</label>
+<div id="compareModelList" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+</div>
+<button class="btn btn-primary" onclick="runCompare()">🚀 开始对比</button>
+<button class="btn btn-ghost" onclick="initCompareModels()" style="margin-left:8px">🔄 刷新模型</button>
+</div>
+<div class="settings-section" id="compareResults" style="display:none">
+<h4><span>📊</span> 对比结果</h4>
+<div id="compareResultsContent"></div>
 </div>
 </div></div></div></div>
 <!-- 常规设置页 -->
@@ -1179,7 +1201,7 @@ function testLocalGit(){var path=$('localGitPath').value.trim();if(!path){alert(
 function pushToLocalGit(content,filename,message){if(!localGitSettings.repoPath){alert('请先在数据设置中配置本地 Git 仓库路径');return}var filePath=prompt('文件路径:',filename||'code.txt');if(!filePath)return;var commitMsg=prompt('提交信息:',message||'Add code from AI Hub');if(!commitMsg)return;fetch('/api/git/local/push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({repo_path:localGitSettings.repoPath,file_path:filePath,content:content,commit_message:commitMsg})}).then(function(r){return r.json()}).then(function(data){if(data.success){alert('✓ '+data.message)}else{alert('✗ 失败: '+(data.detail||data.error||'未知错误'))}}).catch(function(e){alert('✗ 失败: '+e.message)})}
 // 初始化
 marked.setOptions({breaks:true,highlight:function(code,lang){return lang&&hljs.getLanguage(lang)?hljs.highlight(code,{language:lang}).value:code}});
-renderProviders();if(providers.length)selectProvider(providers[0].id);updateChatProviders();initDefaultModelSelects();renderAssistants();if(assistants.length)selectAssistant(assistants[0].id);renderChats();if(chats.length===0)newChat();else selectChat(chats[0].id);renderShortcuts();renderNotes();renderMemories();checkAuth();updateStats();loadGithubSettings();loadLocalGitSettings();
+renderProviders();if(providers.length)selectProvider(providers[0].id);updateChatProviders();initDefaultModelSelects();initCompareModels();renderAssistants();if(assistants.length)selectAssistant(assistants[0].id);renderChats();if(chats.length===0)newChat();else selectChat(chats[0].id);renderShortcuts();renderNotes();renderMemories();checkAuth();updateStats();loadGithubSettings();loadLocalGitSettings();
 // 快捷键
 document.addEventListener('keydown',function(e){
 if((e.ctrlKey||e.metaKey)&&e.key==='n'){e.preventDefault();newChat();showToast('新建对话')}
@@ -1203,6 +1225,12 @@ function goToSearchResult(chatId,msgIndex){hideSearchModal();selectChat(chatId);
 // Token 估算
 function estimateTokens(){var text=$('chatInput').value;if(!text)return;fetch('/api/tokens/estimate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,model:$('chatModel').value})}).then(function(r){return r.json()}).then(function(data){showToast('预估 '+data.tokens+' tokens'+(data.estimated?' (估算)':''))}).catch(function(e){console.error(e)})}
 function showToast(msg){var toast=document.createElement('div');toast.className='toast';toast.textContent=msg;document.body.appendChild(toast);setTimeout(function(){toast.remove()},2000)}
+// 模型对比
+var selectedCompareModels=[];
+function initCompareModels(){var html='';providers.forEach(function(p){if(p.models&&p.models.length>0){p.models.slice(0,5).forEach(function(m){var id=p.id+'_'+m.id;var checked=selectedCompareModels.includes(id)?'checked':'';html+='<label style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--bg);border-radius:8px;cursor:pointer;font-size:13px"><input type="checkbox" onchange="toggleCompareModel(\''+p.id+'\',\''+m.id+'\',\''+p.url+'\',\''+p.key+'\')" '+checked+'><span>'+p.name+'/'+m.name+'</span></label>'})}});$('compareModelList').innerHTML=html||'<span style="color:var(--text2)">请先在模型服务中添加模型</span>'}
+function toggleCompareModel(pid,mid,url,key){var id=pid+'_'+mid;var idx=selectedCompareModels.findIndex(function(m){return m.id===id});if(idx>=0){selectedCompareModels.splice(idx,1)}else if(selectedCompareModels.length<5){selectedCompareModels.push({id:id,provider:pid,model:mid,custom_url:url,api_key:key})}}
+function runCompare(){var question=$('compareQuestion').value.trim();if(!question){alert('请输入问题');return}if(selectedCompareModels.length<2){alert('请至少选择2个模型');return}$('compareResults').style.display='block';$('compareResultsContent').innerHTML='<div style="text-align:center;padding:40px;color:var(--text2)"><div class="message-loading"><div class="dots"><span></span><span></span><span></span></div></div><p style="margin-top:12px">正在对比 '+selectedCompareModels.length+' 个模型...</p></div>';var models=selectedCompareModels.map(function(m){var p=providers.find(function(x){return x.id===m.provider});return{provider:m.provider,model:m.model,custom_url:p?p.url:'',api_key:p?p.key:''}});fetch('/api/compare',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:question,models:models})}).then(function(r){return r.json()}).then(function(data){renderCompareResults(data)}).catch(function(e){$('compareResultsContent').innerHTML='<div style="color:var(--error);padding:20px">对比失败: '+e.message+'</div>'})}
+function renderCompareResults(data){var html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">';data.results.forEach(function(r){var statusColor=r.success?'var(--success)':'var(--error)';html+='<div style="background:var(--bg);border-radius:12px;padding:16px;border-left:4px solid '+statusColor+'"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><strong>'+r.provider+'/'+r.model+'</strong><span style="font-size:12px;color:var(--text2)">'+r.latency+'s</span></div>';if(r.success){html+='<div style="font-size:14px;line-height:1.6;max-height:200px;overflow-y:auto">'+marked.parse(r.content)+'</div><div style="margin-top:12px;font-size:12px;color:var(--text2)">Tokens: '+r.tokens+'</div>'}else{html+='<div style="color:var(--error)">错误: '+r.error+'</div>'}html+='</div>'});html+='</div>';$('compareResultsContent').innerHTML=html}
 // 分享对话
 function shareChat(){if(!authToken){alert('请先登录');return}if(!currentChatId){alert('请先选择对话');return}api('/api/conversations/'+currentChatId+'/share',{method:'POST'}).then(function(data){var url=window.location.origin+data.url;if(navigator.clipboard){navigator.clipboard.writeText(url);showToast('分享链接已复制!')}prompt('分享链接 (7天有效):',url)}).catch(function(e){alert('分享失败: '+e.message)})}
 // 移动端菜单

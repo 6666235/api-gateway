@@ -14,24 +14,102 @@ import time
 import base64
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, AsyncGenerator, List
+from typing import Optional, AsyncGenerator, List, Dict, Any
 from contextlib import contextmanager
 from collections import defaultdict
 from cryptography.fernet import Fernet
+from functools import lru_cache
 import asyncio
+import threading
+from queue import Queue
 
 load_dotenv()
 
 # ========== 日志配置 ==========
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    level=getattr(logging, LOG_LEVEL),
+    format='%(asctime)s - %(levelname)s - [%(name)s] %(message)s',
     handlers=[
         logging.FileHandler('app.log', encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
+
+# ========== 请求缓存 ==========
+class ResponseCache:
+    def __init__(self, max_size: int = 100, ttl: int = 3600):
+        self.cache: Dict[str, tuple] = {}  # key -> (response, timestamp)
+        self.max_size = max_size
+        self.ttl = ttl
+        self.lock = threading.Lock()
+    
+    def _make_key(self, messages: list, model: str) -> str:
+        content = json.dumps(messages, sort_keys=True) + model
+        return hashlib.md5(content.encode()).hexdigest()
+    
+    def get(self, messages: list, model: str) -> Optional[dict]:
+        key = self._make_key(messages, model)
+        with self.lock:
+            if key in self.cache:
+                response, timestamp = self.cache[key]
+                if time.time() - timestamp < self.ttl:
+                    logger.debug(f"Cache hit for {key[:8]}")
+                    return response
+                del self.cache[key]
+        return None
+    
+    def set(self, messages: list, model: str, response: dict):
+        key = self._make_key(messages, model)
+        with self.lock:
+            if len(self.cache) >= self.max_size:
+                # 删除最旧的条目
+                oldest = min(self.cache.items(), key=lambda x: x[1][1])
+                del self.cache[oldest[0]]
+            self.cache[key] = (response, time.time())
+            logger.debug(f"Cached response for {key[:8]}")
+    
+    def clear(self):
+        with self.lock:
+            self.cache.clear()
+
+response_cache = ResponseCache(max_size=200, ttl=1800)  # 30分钟缓存
+
+# ========== 数据库连接池 ==========
+class DatabasePool:
+    def __init__(self, db_path: str, pool_size: int = 5):
+        self.db_path = db_path
+        self.pool_size = pool_size
+        self.pool: Queue = Queue(maxsize=pool_size)
+        self.lock = threading.Lock()
+        self._init_pool()
+    
+    def _init_pool(self):
+        for _ in range(self.pool_size):
+            conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            self.pool.put(conn)
+        logger.info(f"Database pool initialized with {self.pool_size} connections")
+    
+    @contextmanager
+    def get_connection(self):
+        conn = self.pool.get()
+        try:
+            yield conn
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            self.pool.put(conn)
+    
+    def close_all(self):
+        while not self.pool.empty():
+            conn = self.pool.get()
+            conn.close()
+
+logger.info("AI Hub starting...")
 
 # ========== API Key 加密 ==========
 ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
@@ -1219,6 +1297,85 @@ async def chat_completions(request: ChatRequest, req: Request, user=Depends(get_
             raise HTTPException(status_code=502, detail="无法连接到 API 服务器")
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"内部错误: {str(e)}")
+
+# ========== 模型对比 ==========
+class CompareRequest(BaseModel):
+    message: str
+    models: List[dict]  # [{provider, model, api_key, custom_url}, ...]
+
+@app.post("/api/compare")
+async def compare_models(request: CompareRequest, user=Depends(get_current_user)):
+    """同时向多个模型发送请求并对比结果"""
+    if len(request.models) > 5:
+        raise HTTPException(status_code=400, detail="最多同时对比5个模型")
+    
+    async def call_model(model_config: dict) -> dict:
+        provider = model_config.get("provider", "custom")
+        model = model_config.get("model")
+        api_key = clean_api_key(model_config.get("api_key", ""))
+        base_url = model_config.get("custom_url", "")
+        
+        if provider in PROVIDERS:
+            config = PROVIDERS[provider]
+            api_key = api_key or os.getenv(config["env_key"], "")
+            base_url = base_url or config["base_url"]
+        
+        if not base_url.endswith('/v1'):
+            base_url = base_url.rstrip('/') + '/v1'
+        
+        start_time = time.time()
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                response = await client.post(
+                    f"{base_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    json={"model": model, "messages": [{"role": "user", "content": request.message}], "stream": False}
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+                return {
+                    "provider": provider,
+                    "model": model,
+                    "content": content,
+                    "latency": round(time.time() - start_time, 2),
+                    "tokens": result.get("usage", {}).get("total_tokens", 0),
+                    "success": True
+                }
+        except Exception as e:
+            return {
+                "provider": provider,
+                "model": model,
+                "content": "",
+                "error": str(e),
+                "latency": round(time.time() - start_time, 2),
+                "success": False
+            }
+    
+    # 并发调用所有模型
+    tasks = [call_model(m) for m in request.models]
+    results = await asyncio.gather(*tasks)
+    
+    return {"results": results, "message": request.message}
+
+# ========== 缓存管理 ==========
+@app.get("/api/cache/stats")
+async def cache_stats(user=Depends(get_current_user)):
+    """获取缓存统计"""
+    return {
+        "size": len(response_cache.cache),
+        "max_size": response_cache.max_size,
+        "ttl": response_cache.ttl
+    }
+
+@app.post("/api/cache/clear")
+async def clear_cache(user=Depends(get_current_user)):
+    """清空缓存"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    response_cache.clear()
+    logger.info(f"Cache cleared by user {user['id']}")
+    return {"success": True, "message": "缓存已清空"}
 
 # ========== GitHub 推送 ==========
 class GitPushRequest(BaseModel):
