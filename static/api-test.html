@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API 测试工具</title>
+<style>
+:root{--bg:#0f0f1a;--bg2:#1a1a2e;--text:#e8e8f0;--text2:#8888a0;--accent:#6366f1;--border:#2d2d4a;--success:#22c55e;--error:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:40px 20px}
+.container{max-width:900px;margin:0 auto}
+h1{text-align:center;margin-bottom:30px;font-size:28px}
+.card{background:var(--bg2);border-radius:16px;padding:24px;margin-bottom:20px}
+.card h2{font-size:18px;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:13px;color:var(--text2);margin-bottom:8px}
+.form-group input,.form-group textarea,.form-group select{width:100%;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px;font-family:monospace}
+.form-group textarea{min-height:120px;resize:vertical}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.btn{padding:12px 24px;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{opacity:0.9}
+.btn-success{background:var(--success);color:#fff}
+.btn-danger{background:var(--error);color:#fff}
+.btn-group{display:flex;gap:12px;margin-top:20px}
+.result{background:var(--bg);border-radius:8px;padding:16px;margin-top:16px;font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto}
+.result.success{border-left:4px solid var(--success)}
+.result.error{border-left:4px solid var(--error)}
+.status{padding:8px 16px;border-radius:20px;font-size:13px;display:inline-flex;align-items:center;gap:8px}
+.status.success{background:rgba(34,197,94,0.2);color:var(--success)}
+.status.error{background:rgba(239,68,68,0.2);color:var(--error)}
+.status.loading{background:rgba(99,102,241,0.2);color:var(--accent)}
+.timer{font-size:14px;color:var(--accent);margin-left:auto}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.presets{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.preset{padding:6px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;color:var(--text2)}
+.preset:hover{border-color:var(--accent);color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🔧 API 测试工具</h1>
+
+<div class="card">
+<h2>⚙️ 配置</h2>
+<div class="form-group">
+<label>API 地址</label>
+<input type="text" id="apiUrl" placeholder="https://api.example.com/v1">
+</div>
+<div class="form-group">
+<label>API Key</label>
+<div style="position:relative">
+<input type="password" id="apiKey" placeholder="sk-xxxxxxxx" style="padding-right:50px">
+<button type="button" onclick="toggleApiKey()" id="toggleKeyBtn" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;padding:4px 8px">👁️</button>
+</div>
+</div>
+<div class="form-row">
+<div class="form-group">
+<label>模型</label>
+<input type="text" id="model" value="gpt-4o" placeholder="gpt-4o">
+</div>
+<div class="form-group">
+<label>类型</label>
+<select id="apiType">
+<option value="openai">OpenAI 兼容</option>
+<option value="claude">Claude</option>
+</select>
+</div>
+</div>
+<div class="presets">
+<span style="color:var(--text2);font-size:12px;margin-right:8px">预设:</span>
+<button class="preset" onclick="setPreset('openai')">OpenAI</button>
+<button class="preset" onclick="setPreset('deepseek')">DeepSeek</button>
+<button class="preset" onclick="setPreset('zhipu')">智谱AI</button>
+<button class="preset" onclick="setPreset('moonshot')">Moonshot</button>
+<button class="preset" onclick="setPreset('qwen')">通义千问</button>
+</div>
+</div>
+
+<div class="card">
+<h2>💬 测试对话</h2>
+<div class="form-group">
+<label>消息内容</label>
+<textarea id="message" placeholder="输入要发送的消息...">你好，请介绍一下你自己</textarea>
+</div>
+<div class="btn-group">
+<button class="btn btn-primary" onclick="testChat()">🚀 发送请求</button>
+<button class="btn btn-success" onclick="testModels()">📋 获取模型列表</button>
+<button class="btn" style="background:var(--bg);border:1px solid var(--border);color:var(--text)" onclick="testConnection()">🔍 测试连接</button>
+</div>
+</div>
+
+<div class="card">
+<div class="header">
+<h2 style="margin:0">📄 响应结果</h2>
+<span id="status"></span>
+<span id="timer" class="timer"></span>
+</div>
+<div id="result" class="result" style="display:none"></div>
+</div>
+
+<div class="card">
+<h2>📝 请求详情</h2>
+<div id="requestInfo" class="result" style="color:var(--text2)">发送请求后显示详情...</div>
+</div>
+</div>
+
+<script>
+const presets = {
+    openai: { url: 'https://api.openai.com/v1', model: 'gpt-4o' },
+    deepseek: { url: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+    zhipu: { url: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4' },
+    moonshot: { url: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
+    qwen: { url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-turbo' }
+};
+
+function setPreset(name) {
+    const p = presets[name];
+    if (p) {
+        document.getElementById('apiUrl').value = p.url;
+        document.getElementById('model').value = p.model;
+    }
+}
+
+function toggleApiKey() {
+    const input = document.getElementById('apiKey');
+    const btn = document.getElementById('toggleKeyBtn');
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+    } else {
+        input.type = 'password';
+        btn.textContent = '👁️';
+    }
+}
+
+function showStatus(type, text) {
+    const el = document.getElementById('status');
+    el.className = 'status ' + type;
+    el.innerHTML = text;
+}
+
+function showResult(data, isError) {
+    const el = document.getElementById('result');
+    el.style.display = 'block';
+    el.className = 'result ' + (isError ? 'error' : 'success');
+    el.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+}
+
+function showRequest(info) {
+    document.getElementById('requestInfo').textContent = JSON.stringify(info, null, 2);
+}
+
+let startTime = 0;
+let timerInterval = null;
+
+function startTimer() {
+    startTime = Date.now();
+    timerInterval = setInterval(() => {
+        document.getElementById('timer').textContent = ((Date.now() - startTime) / 1000).toFixed(1) + 's';
+    }, 100);
+}
+
+function stopTimer() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+}
+
+// 自动补全 API URL 路径
+function normalizeUrl(url) {
+    url = url.replace(/\/+$/, ''); // 移除末尾斜杠
+    // 如果 URL 不以 /v1 或 /v4 等版本路径结尾，自动添加 /v1
+    if (!/\/v\d+$/.test(url) && !/\/compatible-mode\/v\d+$/.test(url)) {
+        url += '/v1';
+    }
+    return url;
+}
+
+async function testConnection() {
+    let url = document.getElementById('apiUrl').value.trim();
+    const key = document.getElementById('apiKey').value.trim();
+    
+    if (!url || !key) {
+        alert('请填写 API 地址和 API Key');
+        return;
+    }
+    
+    url = normalizeUrl(url);
+    
+    showStatus('loading', '⏳ 测试中...');
+    startTimer();
+    
+    const requestInfo = {
+        method: 'GET',
+        url: url + '/models',
+        headers: { Authorization: 'Bearer ' + key.substring(0, 10) + '...' }
+    };
+    showRequest(requestInfo);
+    
+    try {
+        const resp = await fetch(url + '/models', {
+            headers: { 'Authorization': 'Bearer ' + key }
+        });
+        stopTimer();
+        
+        if (resp.ok) {
+            showStatus('success', '✅ 连接成功');
+            const data = await resp.json();
+            showResult(data, false);
+        } else {
+            showStatus('error', '❌ HTTP ' + resp.status);
+            const text = await resp.text();
+            showResult(text, true);
+        }
+    } catch (e) {
+        stopTimer();
+        showStatus('error', '❌ 请求失败');
+        showResult(e.message, true);
+    }
+}
+
+async function testModels() {
+    await testConnection();
+}
+
+async function testChat() {
+    let url = document.getElementById('apiUrl').value.trim();
+    const key = document.getElementById('apiKey').value.trim();
+    const model = document.getElementById('model').value.trim();
+    const message = document.getElementById('message').value.trim();
+    
+    if (!url || !key || !model || !message) {
+        alert('请填写所有字段');
+        return;
+    }
+    
+    url = normalizeUrl(url);
+    
+    showStatus('loading', '⏳ 请求中...');
+    startTimer();
+    
+    const payload = {
+        model: model,
+        messages: [{ role: 'user', content: message }],
+        stream: false
+    };
+    
+    const requestInfo = {
+        method: 'POST',
+        url: url + '/chat/completions',
+        headers: { 
+            Authorization: 'Bearer ' + key.substring(0, 10) + '...',
+            'Content-Type': 'application/json'
+        },
+        body: payload
+    };
+    showRequest(requestInfo);
+    
+    try {
+        const resp = await fetch(url + '/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + key,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        stopTimer();
+        
+        const data = await resp.json();
+        
+        if (resp.ok) {
+            showStatus('success', '✅ 成功');
+            showResult(data, false);
+        } else {
+            showStatus('error', '❌ HTTP ' + resp.status);
+            showResult(data, true);
+        }
+    } catch (e) {
+        stopTimer();
+        showStatus('error', '❌ 请求失败');
+        showResult(e.message, true);
+    }
+}
+</script>
+</body>
+</html>

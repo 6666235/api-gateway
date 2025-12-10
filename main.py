@@ -14,8 +14,36 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional, AsyncGenerator, List
 from contextlib import contextmanager
+from collections import defaultdict
+import asyncio
 
 load_dotenv()
+
+# ========== 速率限制 ==========
+class RateLimiter:
+    def __init__(self, requests_per_minute: int = 60):
+        self.requests_per_minute = requests_per_minute
+        self.requests = defaultdict(list)
+        self.lock = asyncio.Lock()
+    
+    async def is_allowed(self, key: str) -> bool:
+        async with self.lock:
+            now = time.time()
+            minute_ago = now - 60
+            # 清理过期记录
+            self.requests[key] = [t for t in self.requests[key] if t > minute_ago]
+            if len(self.requests[key]) >= self.requests_per_minute:
+                return False
+            self.requests[key].append(now)
+            return True
+    
+    def get_remaining(self, key: str) -> int:
+        now = time.time()
+        minute_ago = now - 60
+        recent = [t for t in self.requests[key] if t > minute_ago]
+        return max(0, self.requests_per_minute - len(recent))
+
+rate_limiter = RateLimiter(requests_per_minute=60)
 
 app = FastAPI(title="AI Hub", description="统一 AI 平台")
 
@@ -118,6 +146,22 @@ def init_db():
                 is_active INTEGER DEFAULT 1,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
+            CREATE TABLE IF NOT EXISTS api_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                provider TEXT,
+                model TEXT,
+                tokens_input INTEGER DEFAULT 0,
+                tokens_output INTEGER DEFAULT 0,
+                latency_ms INTEGER DEFAULT 0,
+                status TEXT,
+                error TEXT,
+                ip_address TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_api_logs_user ON api_logs(user_id);
+            CREATE INDEX IF NOT EXISTS idx_api_logs_created ON api_logs(created_at);
         ''')
 
 init_db()
@@ -251,6 +295,90 @@ async def logout(authorization: Optional[str] = Header(None)):
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
     return {"success": True}
 
+# ========== 健康检查 ==========
+@app.get("/health")
+async def health_check():
+    """健康检查接口"""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("SELECT 1")
+        db_status = "healthy"
+    except:
+        db_status = "unhealthy"
+    
+    return {
+        "status": "ok" if db_status == "healthy" else "degraded",
+        "timestamp": datetime.now().isoformat(),
+        "version": "1.0.0",
+        "components": {
+            "database": db_status,
+            "api": "healthy"
+        }
+    }
+
+@app.get("/api/stats")
+async def get_stats(user=Depends(get_current_user)):
+    """获取用户统计信息"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        
+        # 今日调用次数
+        today = datetime.now().strftime("%Y-%m-%d")
+        today_calls = conn.execute(
+            "SELECT COUNT(*) as cnt FROM api_logs WHERE user_id = ? AND date(created_at) = ?",
+            (user["id"], today)
+        ).fetchone()["cnt"]
+        
+        # 总调用次数
+        total_calls = conn.execute(
+            "SELECT COUNT(*) as cnt FROM api_logs WHERE user_id = ?",
+            (user["id"],)
+        ).fetchone()["cnt"]
+        
+        # 总 token 使用量
+        token_stats = conn.execute(
+            "SELECT COALESCE(SUM(tokens_input), 0) as input, COALESCE(SUM(tokens_output), 0) as output FROM api_logs WHERE user_id = ?",
+            (user["id"],)
+        ).fetchone()
+        
+        # 按模型统计
+        model_stats = conn.execute(
+            "SELECT provider, model, COUNT(*) as calls, SUM(tokens_input + tokens_output) as tokens FROM api_logs WHERE user_id = ? GROUP BY provider, model ORDER BY calls DESC LIMIT 10",
+            (user["id"],)
+        ).fetchall()
+        
+        # 最近7天趋势
+        daily_stats = conn.execute(
+            "SELECT date(created_at) as day, COUNT(*) as calls FROM api_logs WHERE user_id = ? AND created_at >= date('now', '-7 days') GROUP BY date(created_at) ORDER BY day",
+            (user["id"],)
+        ).fetchall()
+        
+        return {
+            "today_calls": today_calls,
+            "total_calls": total_calls,
+            "tokens_input": token_stats["input"],
+            "tokens_output": token_stats["output"],
+            "model_stats": [dict(r) for r in model_stats],
+            "daily_stats": [dict(r) for r in daily_stats]
+        }
+
+@app.get("/api/logs")
+async def get_logs(limit: int = 50, user=Depends(get_current_user)):
+    """获取 API 调用日志"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM api_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            (user["id"], limit)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
 # ========== 对话管理 ==========
 @app.get("/api/conversations")
 async def list_conversations(user=Depends(get_current_user)):
@@ -290,6 +418,55 @@ async def delete_conversation(conv_id: str):
         conn.execute("DELETE FROM messages WHERE conversation_id = ?", (conv_id,))
         conn.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
     return {"success": True}
+
+@app.get("/api/conversations/{conv_id}/export")
+async def export_conversation(conv_id: str, format: str = "markdown"):
+    """导出对话为 Markdown 或 JSON"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        conv = conn.execute("SELECT * FROM conversations WHERE id = ?", (conv_id,)).fetchone()
+        if not conv:
+            raise HTTPException(status_code=404, detail="对话不存在")
+        
+        messages = conn.execute(
+            "SELECT role, content, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at",
+            (conv_id,)
+        ).fetchall()
+    
+    if format == "json":
+        return {
+            "id": conv["id"],
+            "title": conv["title"],
+            "provider": conv["provider"],
+            "model": conv["model"],
+            "created_at": conv["created_at"],
+            "messages": [dict(m) for m in messages]
+        }
+    else:
+        # Markdown 格式
+        lines = [f"# {conv['title'] or '对话记录'}", ""]
+        lines.append(f"- 模型: {conv['provider']}/{conv['model']}")
+        lines.append(f"- 时间: {conv['created_at']}")
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+        
+        for msg in messages:
+            role_name = "👤 用户" if msg["role"] == "user" else "🤖 助手"
+            content = msg["content"]
+            # 处理图片消息
+            if isinstance(content, str) and content.startswith("["):
+                try:
+                    content = json.loads(content)
+                    content = "[图片消息]"
+                except:
+                    pass
+            lines.append(f"### {role_name}")
+            lines.append("")
+            lines.append(str(content))
+            lines.append("")
+        
+        return {"content": "\n".join(lines), "filename": f"{conv['title'] or 'chat'}_{conv_id}.md"}
 
 # ========== 笔记功能 ==========
 @app.get("/api/notes")
@@ -644,8 +821,14 @@ async def list_providers():
     return {"providers": list(PROVIDERS.keys()), "details": PROVIDERS}
 
 @app.post("/v1/chat/completions")
-async def chat_completions(request: ChatRequest, user=Depends(get_current_user)):
+async def chat_completions(request: ChatRequest, req: Request, user=Depends(get_current_user)):
     provider = request.provider.lower()
+    start_time = time.time()
+    
+    # 速率限制
+    rate_key = f"user_{user['id']}" if user else f"ip_{req.client.host}"
+    if not await rate_limiter.is_allowed(rate_key):
+        raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
     
     # 检查用户额度
     if user:
@@ -753,15 +936,22 @@ async def chat_completions(request: ChatRequest, user=Depends(get_current_user))
             
             response.raise_for_status()
             result = response.json()
+            latency_ms = int((time.time() - start_time) * 1000)
+            
+            # 获取 token 使用量
+            usage = result.get("usage", {})
+            tokens_input = usage.get("prompt_tokens", 0)
+            tokens_output = usage.get("completion_tokens", 0)
             
             # 保存消息到数据库
             if request.conversation_id and user:
                 with sqlite3.connect(DB_PATH) as conn:
                     # 保存用户消息
                     user_msg = request.messages[-1]
+                    user_content = user_msg.content if isinstance(user_msg.content, str) else json.dumps(user_msg.content)
                     conn.execute(
                         "INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)",
-                        (request.conversation_id, user_msg.role, user_msg.content)
+                        (request.conversation_id, user_msg.role, user_content)
                     )
                     # 保存助手回复
                     if provider_type == "claude":
@@ -772,28 +962,63 @@ async def chat_completions(request: ChatRequest, user=Depends(get_current_user))
                         "INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)",
                         (request.conversation_id, "assistant", assistant_content)
                     )
-                    # 更新对话标题
+                    # 自动生成对话标题（使用首条消息的前30字符，或让AI生成）
                     if len(request.messages) == 1:
-                        title = request.messages[0].content[:30]
+                        first_content = request.messages[0].content
+                        if isinstance(first_content, str):
+                            title = first_content[:30].replace('\n', ' ')
+                        else:
+                            title = "图片对话"
+                        if len(first_content) > 30:
+                            title += "..."
                         conn.execute("UPDATE conversations SET title = ? WHERE id = ?", (title, request.conversation_id))
                     conn.execute("UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", (request.conversation_id,))
                     # 更新用户token使用量
-                    tokens = result.get("usage", {}).get("total_tokens", 100)
-                    conn.execute("UPDATE users SET tokens_used = tokens_used + ? WHERE id = ?", (tokens, user["id"]))
+                    total_tokens = tokens_input + tokens_output or 100
+                    conn.execute("UPDATE users SET tokens_used = tokens_used + ? WHERE id = ?", (total_tokens, user["id"]))
+            
+            # 记录 API 调用日志
+            if user:
+                with sqlite3.connect(DB_PATH) as conn:
+                    conn.execute(
+                        "INSERT INTO api_logs (user_id, provider, model, tokens_input, tokens_output, latency_ms, status, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (user["id"], provider, request.model, tokens_input, tokens_output, latency_ms, "success", req.client.host if req.client else "")
+                    )
             
             return result
             
         except httpx.HTTPStatusError as e:
+            latency_ms = int((time.time() - start_time) * 1000)
             error_detail = f"API 请求失败 ({e.response.status_code})"
             try:
                 err_json = e.response.json()
                 error_detail = err_json.get("error", {}).get("message", str(err_json))
             except:
                 error_detail = e.response.text[:200] if e.response.text else str(e)
+            # 记录错误日志
+            if user:
+                with sqlite3.connect(DB_PATH) as conn:
+                    conn.execute(
+                        "INSERT INTO api_logs (user_id, provider, model, latency_ms, status, error, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (user["id"], provider, request.model, latency_ms, "error", error_detail[:500], req.client.host if req.client else "")
+                    )
             raise HTTPException(status_code=e.response.status_code, detail=error_detail)
         except httpx.TimeoutException:
+            latency_ms = int((time.time() - start_time) * 1000)
+            if user:
+                with sqlite3.connect(DB_PATH) as conn:
+                    conn.execute(
+                        "INSERT INTO api_logs (user_id, provider, model, latency_ms, status, error, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (user["id"], provider, request.model, latency_ms, "timeout", "请求超时", req.client.host if req.client else "")
+                    )
             raise HTTPException(status_code=504, detail="请求超时")
         except httpx.ConnectError:
+            if user:
+                with sqlite3.connect(DB_PATH) as conn:
+                    conn.execute(
+                        "INSERT INTO api_logs (user_id, provider, model, latency_ms, status, error, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (user["id"], provider, request.model, 0, "error", "无法连接到 API 服务器", req.client.host if req.client else "")
+                    )
             raise HTTPException(status_code=502, detail="无法连接到 API 服务器")
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"内部错误: {str(e)}")
@@ -956,11 +1181,16 @@ async def local_git_test(data: dict):
         return {"success": False, "error": str(e)}
 
 # ========== 静态文件 ==========
+import pathlib
+BASE_DIR = pathlib.Path(__file__).parent.resolve()
+STATIC_DIR = BASE_DIR / "static"
+
 @app.get("/")
 async def root():
-    return FileResponse("static/index.html")
+    return FileResponse(STATIC_DIR / "index.html")
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 if __name__ == "__main__":
     import uvicorn
