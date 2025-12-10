@@ -950,6 +950,11 @@ print('Hello, World!')"></textarea>
 <div class="hotkey-row"><span>切换话题显示</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + ]</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
 <div class="hotkey-row"><span>复制上一条消息</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + Shift + C</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div></div>
 <div class="hotkey-row"><span>编辑最后一条用户消息</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + Shift + E</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>系统状态</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + H</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>批量选择模式</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + B</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>批量导出</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + Shift + E</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>搜索当前对话</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + F</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
+<div class="hotkey-row"><span>切换主题</span><div class="hotkey-right"><span class="hotkey-key">Ctrl + D</span><span class="hotkey-info">ℹ️</span><span class="hotkey-lock">🔒</span><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></div></div>
 </div>
 </div></div></div></div>
 <!-- 快捷助手页 -->
@@ -1514,6 +1519,8 @@ document.addEventListener('keydown',function(e){
 if(e.ctrlKey&&e.key==='h'){e.preventDefault();showHealthDashboard()}
 if(e.ctrlKey&&e.key==='b'){e.preventDefault();toggleBatchMode()}
 if(e.ctrlKey&&e.shiftKey&&e.key==='E'){e.preventDefault();batchExportChats()}
+if(e.ctrlKey&&e.key==='f'){e.preventDefault();searchInCurrentChat()}
+if(e.ctrlKey&&e.key==='/'||e.key==='?'){e.preventDefault();showHotkeyHelp()}
 });
 
 // ========== 性能优化：虚拟滚动 ==========
@@ -1672,6 +1679,34 @@ showCustomModal('📈 使用分析',html,'analyticsModal')
 
 // 初始化时加载推荐
 setTimeout(loadRecommendations,1000);
+
+// ========== 快捷键帮助 ==========
+function showHotkeyHelp(){
+var html='<div style="display:grid;gap:8px">';
+var hotkeys=[
+['Ctrl + N','新建对话'],
+['Ctrl + K','全局搜索'],
+['Ctrl + D','切换主题'],
+['Ctrl + H','系统状态'],
+['Ctrl + B','批量选择'],
+['Ctrl + F','搜索当前对话'],
+['Ctrl + /','快捷键帮助'],
+['Enter','发送消息'],
+['Shift + Enter','换行'],
+['Escape','关闭弹窗']
+];
+hotkeys.forEach(function(h){
+html+='<div class="hotkey-help-item"><span>'+h[1]+'</span><span class="hotkey-help-key">'+h[0]+'</span></div>'
+});
+html+='</div>';
+showCustomModal('⌨️ 快捷键帮助',html,'hotkeyHelpModal')}
+
+// ========== 欢迎引导 ==========
+function showWelcomeGuide(){
+if(localStorage.getItem('welcomeShown'))return;
+var html='<div style="text-align:center;padding:20px"><div style="font-size:48px;margin-bottom:16px">🤖</div><h2 style="margin-bottom:12px">欢迎使用 AI Hub</h2><p style="color:var(--text2);margin-bottom:24px">一站式 AI 平台，支持多模型、多功能</p><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;text-align:left;margin-bottom:24px"><div style="padding:16px;background:var(--bg);border-radius:10px"><span style="font-size:20px">💬</span><div style="font-weight:500;margin-top:8px">多模型对话</div><div style="font-size:12px;color:var(--text2)">支持 OpenAI、Claude、Gemini 等</div></div><div style="padding:16px;background:var(--bg);border-radius:10px"><span style="font-size:20px">🎨</span><div style="font-weight:500;margin-top:8px">图片生成</div><div style="font-size:12px;color:var(--text2)">DALL-E 3 AI 绘图</div></div><div style="padding:16px;background:var(--bg);border-radius:10px"><span style="font-size:20px">📚</span><div style="font-weight:500;margin-top:8px">知识库</div><div style="font-size:12px;color:var(--text2)">上传文档，智能问答</div></div><div style="padding:16px;background:var(--bg);border-radius:10px"><span style="font-size:20px">👥</span><div style="font-weight:500;margin-top:8px">团队协作</div><div style="font-size:12px;color:var(--text2)">多人共享对话和资源</div></div></div><button class="btn btn-primary" onclick="closeModal(\'welcomeModal\');localStorage.setItem(\'welcomeShown\',\'1\')">开始使用</button></div>';
+showCustomModal('',html,'welcomeModal')}
+setTimeout(showWelcomeGuide,500);
 
 console.log('🤖 AI Hub v2.0.0 - Enhanced');
 </script>
