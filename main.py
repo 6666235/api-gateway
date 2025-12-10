@@ -214,6 +214,9 @@ def init_db():
                 title TEXT,
                 provider TEXT,
                 model TEXT,
+                tags TEXT DEFAULT '',
+                pinned INTEGER DEFAULT 0,
+                archived INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
@@ -655,6 +658,58 @@ async def delete_conversation(conv_id: str):
         conn.execute("DELETE FROM messages WHERE conversation_id = ?", (conv_id,))
         conn.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
     return {"success": True}
+
+@app.put("/api/conversations/{conv_id}")
+async def update_conversation(conv_id: str, data: dict, user=Depends(get_current_user)):
+    """更新对话信息（标题、标签等）"""
+    with sqlite3.connect(DB_PATH) as conn:
+        updates = []
+        params = []
+        if "title" in data:
+            updates.append("title = ?")
+            params.append(data["title"])
+        if "tags" in data:
+            updates.append("tags = ?")
+            params.append(data["tags"])
+        if "pinned" in data:
+            updates.append("pinned = ?")
+            params.append(1 if data["pinned"] else 0)
+        
+        if updates:
+            params.append(conv_id)
+            conn.execute(f"UPDATE conversations SET {', '.join(updates)}, updated_at = CURRENT_TIMESTAMP WHERE id = ?", params)
+    
+    return {"success": True}
+
+@app.post("/api/conversations/{conv_id}/pin")
+async def pin_conversation(conv_id: str, user=Depends(get_current_user)):
+    """置顶对话"""
+    with sqlite3.connect(DB_PATH) as conn:
+        # 切换置顶状态
+        current = conn.execute("SELECT pinned FROM conversations WHERE id = ?", (conv_id,)).fetchone()
+        new_pinned = 0 if current and current[0] else 1
+        conn.execute("UPDATE conversations SET pinned = ? WHERE id = ?", (new_pinned, conv_id))
+    return {"success": True, "pinned": new_pinned == 1}
+
+@app.post("/api/conversations/{conv_id}/archive")
+async def archive_conversation(conv_id: str, user=Depends(get_current_user)):
+    """归档对话"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("UPDATE conversations SET archived = 1 WHERE id = ?", (conv_id,))
+    return {"success": True}
+
+@app.get("/api/conversations/archived")
+async def list_archived_conversations(user=Depends(get_current_user)):
+    """获取归档的对话"""
+    if not user:
+        return []
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM conversations WHERE user_id = ? AND archived = 1 ORDER BY updated_at DESC",
+            (user["id"],)
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 @app.get("/api/search")
 async def search_messages(q: str, user=Depends(get_current_user)):
