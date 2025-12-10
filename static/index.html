@@ -248,6 +248,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="nav-item" data-page="display"><span class="nav-item-icon">🖥️</span> 显示设置</div>
 <div class="nav-item" data-page="data"><span class="nav-item-icon">💾</span> 数据设置</div>
 <div class="nav-item" data-page="stats"><span class="nav-item-icon">📊</span> 使用统计</div>
+<div class="nav-item" data-page="traces"><span class="nav-item-icon">🔍</span> 链路追踪</div>
 <div class="nav-item" data-page="tokens"><span class="nav-item-icon">🔑</span> API Token</div>
 <div class="nav-item" data-page="teams"><span class="nav-item-icon">👥</span> 团队空间</div>
 <div class="nav-item" data-page="knowledge"><span class="nav-item-icon">📚</span> 知识库</div>
@@ -260,6 +261,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="nav-item" data-page="search"><span class="nav-item-icon">🌐</span> 网络搜索</div>
 <div class="nav-item" data-page="memory"><span class="nav-item-icon">🧠</span> 全局记忆</div>
 <div class="nav-item" data-page="api-server"><span class="nav-item-icon">🖥️</span> API 服务器</div>
+<div class="nav-item" data-page="integrations"><span class="nav-item-icon">🔗</span> 第三方集成</div>
 <div class="nav-item" data-page="documents"><span class="nav-item-icon">📄</span> 文档处理</div>
 <div class="nav-item" data-page="workflows"><span class="nav-item-icon">🤖</span> Agent 工作流</div>
 <div class="nav-item" data-page="code-runner"><span class="nav-item-icon">▶️</span> 代码运行</div>
@@ -626,6 +628,37 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 </div>
 </div></div></div></div>
+<!-- 链路追踪页 -->
+<div id="page-traces" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+<h4 style="margin:0"><span>🔍</span> 链路追踪</h4>
+<div style="display:flex;gap:8px">
+<button class="btn btn-ghost btn-sm" onclick="loadTraces()">🔄 刷新</button>
+<button class="btn btn-ghost btn-sm" onclick="exportTraces()">📥 导出</button>
+</div>
+</div>
+<p style="color:var(--text2);font-size:13px;margin-bottom:20px">监控 API 请求的完整调用链路，分析性能瓶颈</p>
+<div id="tracesList"><p style="color:var(--text2)">点击刷新加载追踪记录</p></div>
+</div>
+<div class="settings-section">
+<h4><span>📊</span> 性能概览</h4>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+<div style="background:var(--bg);padding:16px;border-radius:10px;text-align:center">
+<div style="font-size:24px;font-weight:600;color:var(--accent)" id="traceAvgLatency">-</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">平均延迟</div>
+</div>
+<div style="background:var(--bg);padding:16px;border-radius:10px;text-align:center">
+<div style="font-size:24px;font-weight:600;color:var(--success)" id="traceSuccessRate">-</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">成功率</div>
+</div>
+<div style="background:var(--bg);padding:16px;border-radius:10px;text-align:center">
+<div style="font-size:24px;font-weight:600;color:var(--warning)" id="traceCount">-</div>
+<div style="font-size:12px;color:var(--text2);margin-top:4px">总追踪数</div>
+</div>
+</div>
+</div>
+</div></div></div></div>
 <!-- API Token 页 -->
 <div id="page-tokens" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
 <div class="settings-section">
@@ -794,6 +827,44 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 </div>
 <div id="memoryList"></div>
+</div>
+</div></div></div></div>
+<!-- 第三方集成页 -->
+<div id="page-integrations" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>🔗</span> 第三方集成</h4>
+<p style="color:var(--text2);font-size:13px;margin-bottom:20px">连接 Slack、飞书等平台，让 AI 助手无处不在</p>
+</div>
+<div class="settings-section">
+<h4><span>💬</span> Slack 集成</h4>
+<div class="form-group"><label>Bot Token</label><input type="password" id="slackToken" placeholder="xoxb-..." onchange="saveIntegration('slack')"></div>
+<div class="form-group"><label>Signing Secret</label><input type="password" id="slackSecret" placeholder="签名密钥" onchange="saveIntegration('slack')"></div>
+<div class="form-group"><label>Webhook URL</label><div style="display:flex;gap:8px"><input type="text" value="http://localhost:8000/api/integrations/slack/webhook" readonly style="flex:1;background:var(--bg3);font-size:12px"><button class="btn btn-ghost btn-sm" onclick="copyText(this.previousElementSibling.value)">📋</button></div></div>
+<div style="display:flex;gap:12px;margin-top:16px">
+<button class="btn btn-primary" onclick="testSlackIntegration()">🧪 测试连接</button>
+<button class="btn btn-ghost" onclick="window.open('https://api.slack.com/apps','_blank')">📖 创建 Slack App</button>
+</div>
+</div>
+<div class="settings-section">
+<h4><span>🐦</span> 飞书集成</h4>
+<div class="form-group"><label>App ID</label><input type="text" id="feishuAppId" placeholder="cli_..." onchange="saveIntegration('feishu')"></div>
+<div class="form-group"><label>App Secret</label><input type="password" id="feishuSecret" placeholder="应用密钥" onchange="saveIntegration('feishu')"></div>
+<div class="form-group"><label>Webhook URL</label><div style="display:flex;gap:8px"><input type="text" value="http://localhost:8000/api/integrations/feishu/webhook" readonly style="flex:1;background:var(--bg3);font-size:12px"><button class="btn btn-ghost btn-sm" onclick="copyText(this.previousElementSibling.value)">📋</button></div></div>
+<div style="display:flex;gap:12px;margin-top:16px">
+<button class="btn btn-primary" onclick="testFeishuIntegration()">🧪 测试连接</button>
+<button class="btn btn-ghost" onclick="window.open('https://open.feishu.cn/app','_blank')">📖 创建飞书应用</button>
+</div>
+</div>
+<div class="settings-section">
+<h4><span>🔔</span> Webhook 通知</h4>
+<div class="form-group"><label>通知 URL</label><input type="text" id="webhookUrl" placeholder="https://your-server.com/webhook" onchange="saveIntegration('webhook')"></div>
+<div class="setting-row"><div class="setting-row-label">新消息通知</div><label class="switch"><input type="checkbox" id="webhookNewMsg"><span class="switch-slider"></span></label></div>
+<div class="setting-row"><div class="setting-row-label">错误通知</div><label class="switch"><input type="checkbox" id="webhookError"><span class="switch-slider"></span></label></div>
+</div>
+<div class="settings-section">
+<h4><span>🎛️</span> 灰度发布</h4>
+<div id="featureFlagsList"></div>
+<button class="btn btn-ghost" onclick="loadFeatureFlags()" style="margin-top:12px">🔄 刷新</button>
 </div>
 </div></div></div></div>
 <!-- API服务器页 -->
@@ -1203,7 +1274,7 @@ function showModal(id){$(id).classList.add('show')}
 function setAccent(c){document.documentElement.style.setProperty('--accent',c)}
 function toggleCollapse(el){var content=el.nextElementSibling;content.classList.toggle('show');el.querySelector('span:last-child').textContent=content.classList.contains('show')?'▲':'▼'}
 function api(path,options){options=options||{};var headers=Object.assign({'Content-Type':'application/json'},options.headers||{});if(authToken)headers['Authorization']='Bearer '+authToken;return fetch(path,Object.assign({},options,{headers:headers})).then(function(res){if(!res.ok)return res.json().then(function(e){throw new Error(e.detail||'Error')});return res.json()})}
-document.querySelectorAll('.nav-item[data-page]').forEach(function(n){n.onclick=function(){document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});n.classList.add('active');var page=$('page-'+n.dataset.page);if(page)page.classList.add('active');if(n.dataset.page==='stats')loadStats();if(n.dataset.page==='tokens')loadTokens();if(n.dataset.page==='teams')loadTeams();if(n.dataset.page==='knowledge')loadKnowledgeBases();if(n.dataset.page==='workflows')loadWorkflowTemplates();closeMobileMenus()}});
+document.querySelectorAll('.nav-item[data-page]').forEach(function(n){n.onclick=function(){document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});n.classList.add('active');var page=$('page-'+n.dataset.page);if(page)page.classList.add('active');if(n.dataset.page==='stats')loadStats();if(n.dataset.page==='tokens')loadTokens();if(n.dataset.page==='teams')loadTeams();if(n.dataset.page==='knowledge')loadKnowledgeBases();if(n.dataset.page==='workflows')loadWorkflowTemplates();if(n.dataset.page==='traces')loadTraces();if(n.dataset.page==='integrations')loadFeatureFlags();closeMobileMenus()}});
 function showAuthModal(){isRegisterMode=false;updateAuthUI();showModal('authModal')}
 function toggleAuthMode(){isRegisterMode=!isRegisterMode;updateAuthUI()}
 function updateAuthUI(){$('authTitle').textContent=isRegisterMode?'注册':'登录';$('authSubmit').textContent=isRegisterMode?'注册':'登录';$('authEmailGroup').style.display=isRegisterMode?'block':'none';$('authSwitch').innerHTML=isRegisterMode?'已有账号？<a href="#" onclick="toggleAuthMode()" style="color:var(--accent)">登录</a>':'没有账号？<a href="#" onclick="toggleAuthMode()" style="color:var(--accent)">注册</a>'}
@@ -1681,8 +1752,113 @@ html+='</div>';
 showCustomModal('📈 使用分析',html,'analyticsModal')
 }).catch(function(e){alert('获取分析失败: '+e.message)})}
 
+// ========== 第三方集成 ==========
+function saveIntegration(type){
+var data={};
+if(type==='slack'){
+data={slack_token:$('slackToken').value,slack_secret:$('slackSecret').value}
+}else if(type==='feishu'){
+data={feishu_app_id:$('feishuAppId').value,feishu_secret:$('feishuSecret').value}
+}else if(type==='webhook'){
+data={webhook_url:$('webhookUrl').value,webhook_new_msg:$('webhookNewMsg').checked,webhook_error:$('webhookError').checked}
+}
+localStorage.setItem('integration_'+type,JSON.stringify(data));
+showToast('配置已保存')}
+
+function loadIntegrations(){
+try{
+var slack=JSON.parse(localStorage.getItem('integration_slack')||'{}');
+if(slack.slack_token)$('slackToken').value=slack.slack_token;
+if(slack.slack_secret)$('slackSecret').value=slack.slack_secret;
+var feishu=JSON.parse(localStorage.getItem('integration_feishu')||'{}');
+if(feishu.feishu_app_id)$('feishuAppId').value=feishu.feishu_app_id;
+if(feishu.feishu_secret)$('feishuSecret').value=feishu.feishu_secret;
+var webhook=JSON.parse(localStorage.getItem('integration_webhook')||'{}');
+if(webhook.webhook_url)$('webhookUrl').value=webhook.webhook_url;
+if(webhook.webhook_new_msg)$('webhookNewMsg').checked=true;
+if(webhook.webhook_error)$('webhookError').checked=true;
+}catch(e){}}
+
+function testSlackIntegration(){
+showToast('测试 Slack 连接...');
+api('/api/integrations/slack/send',{method:'POST',body:JSON.stringify({channel:'#general',text:'AI Hub 测试消息'})}).then(function(data){
+if(data.ok){showToast('Slack 连接成功!')}else{alert('连接失败: '+(data.error||'未知错误'))}
+}).catch(function(e){alert('连接失败: '+e.message)})}
+
+function testFeishuIntegration(){
+showToast('测试飞书连接...');
+api('/api/integrations/feishu/send',{method:'POST',body:JSON.stringify({chat_id:'test',text:'AI Hub 测试消息'})}).then(function(data){
+if(data.code===0){showToast('飞书连接成功!')}else{alert('连接失败: '+(data.msg||'未知错误'))}
+}).catch(function(e){alert('连接失败: '+e.message)})}
+
+// ========== 灰度发布 ==========
+function loadFeatureFlags(){
+api('/api/features/all').then(function(data){
+var html='';
+for(var name in data){
+var flag=data[name];
+html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px">';
+html+='<div><strong>'+name+'</strong><div style="font-size:12px;color:var(--text2);margin-top:4px">灰度比例: '+flag.percentage+'% · 白名单用户: '+(flag.users?flag.users.length:0)+'</div></div>';
+html+='<label class="switch"><input type="checkbox" '+(flag.enabled?'checked':'')+' onchange="toggleFeatureFlag(\''+name+'\',this.checked)"><span class="switch-slider"></span></label>';
+html+='</div>'}
+$('featureFlagsList').innerHTML=html||'<p style="color:var(--text2)">暂无功能开关</p>'
+}).catch(function(e){$('featureFlagsList').innerHTML='<p style="color:var(--error)">加载失败</p>'})}
+
+function toggleFeatureFlag(name,enabled){
+api('/api/features/'+name,{method:'POST',body:JSON.stringify({enabled:enabled})}).then(function(){
+showToast(name+(enabled?' 已启用':' 已禁用'))
+}).catch(function(e){alert('操作失败: '+e.message)})}
+
+function updateFeatureFlagPercentage(name,percentage){
+api('/api/features/'+name,{method:'POST',body:JSON.stringify({percentage:parseInt(percentage)})}).then(function(){
+showToast('灰度比例已更新')
+}).catch(function(e){alert('操作失败: '+e.message)})}
+
+// ========== 链路追踪 ==========
+function loadTraces(){
+api('/api/traces?limit=50').then(function(data){
+if(data.length===0){$('tracesList').innerHTML='<p style="color:var(--text2)">暂无追踪记录</p>';return}
+var html='<table style="width:100%;border-collapse:collapse;font-size:13px"><tr style="background:var(--bg2)"><th style="padding:10px;text-align:left">ID</th><th style="padding:10px">名称</th><th style="padding:10px;text-align:right">耗时</th><th style="padding:10px">Spans</th></tr>';
+data.forEach(function(t){
+html+='<tr style="border-top:1px solid var(--border);cursor:pointer" onclick="showTraceDetail(\''+t.id+'\')">';
+html+='<td style="padding:10px;font-family:monospace">'+t.id+'</td>';
+html+='<td style="padding:10px">'+t.name+'</td>';
+html+='<td style="padding:10px;text-align:right">'+(t.total_duration?(t.total_duration*1000).toFixed(0)+'ms':'-')+'</td>';
+html+='<td style="padding:10px">'+(t.spans?t.spans.length:0)+'</td>';
+html+='</tr>'});
+html+='</table>';
+$('tracesList').innerHTML=html
+}).catch(function(e){$('tracesList').innerHTML='<p style="color:var(--error)">加载失败</p>'})}
+
+function showTraceDetail(traceId){
+api('/api/traces/'+traceId).then(function(data){
+var html='<div style="margin-bottom:16px"><strong>Trace ID:</strong> '+data.id+'<br><strong>名称:</strong> '+data.name+'<br><strong>总耗时:</strong> '+(data.total_duration?(data.total_duration*1000).toFixed(0)+'ms':'-')+'</div>';
+if(data.spans&&data.spans.length>0){
+html+='<h4 style="margin-bottom:12px">Spans</h4>';
+data.spans.forEach(function(s,i){
+var width=Math.min(100,s.duration*100);
+html+='<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:13px"><span>'+s.name+'</span><span>'+(s.duration*1000).toFixed(0)+'ms</span></div><div style="background:var(--bg3);border-radius:4px;height:8px;margin-top:4px"><div style="background:var(--accent);height:100%;width:'+width+'%;border-radius:4px"></div></div></div>'
+})}
+showCustomModal('🔍 追踪详情',html,'traceDetailModal')
+}).catch(function(e){alert('加载失败: '+e.message)})}
+
+function exportTraces(){
+api('/api/traces?limit=100').then(function(data){
+if(data.length===0){alert('暂无追踪记录');return}
+var traceIds=data.map(function(t){return t.id});
+api('/api/traces/export',{method:'POST',body:JSON.stringify({trace_ids:traceIds,format:'jaeger'})}).then(function(result){
+var blob=new Blob([JSON.stringify(result.data,null,2)],{type:'application/json'});
+var a=document.createElement('a');
+a.href=URL.createObjectURL(blob);
+a.download='traces_export_'+new Date().toISOString().slice(0,10)+'.json';
+a.click();
+showToast('追踪数据已导出')
+}).catch(function(e){alert('导出失败: '+e.message)})
+}).catch(function(e){alert('获取追踪失败: '+e.message)})}
+
 // 初始化时加载推荐
 setTimeout(loadRecommendations,1000);
+setTimeout(loadIntegrations,100);
 
 // ========== 快捷键帮助 ==========
 function showHotkeyHelp(){

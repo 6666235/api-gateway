@@ -1791,6 +1791,396 @@ async def list_traces(limit: int = 20, user=Depends(get_current_user)):
     traces = list(tracer.traces.values())[-limit:]
     return traces
 
+@app.get("/api/traces/{trace_id}")
+async def get_trace(trace_id: str):
+    """获取单个追踪详情"""
+    if trace_id in tracer.traces:
+        return tracer.traces[trace_id]
+    raise HTTPException(status_code=404, detail="追踪记录不存在")
+
+@app.post("/api/traces/export")
+async def export_traces(data: dict, user=Depends(get_current_user)):
+    """导出追踪数据（Jaeger 格式）"""
+    trace_ids = data.get("trace_ids", [])
+    format_type = data.get("format", "jaeger")
+    
+    traces_data = []
+    for tid in trace_ids:
+        if tid in tracer.traces:
+            traces_data.append(tracer.traces[tid])
+    
+    if format_type == "jaeger":
+        # 转换为 Jaeger 格式
+        jaeger_traces = []
+        for t in traces_data:
+            jaeger_traces.append({
+                "traceID": t["id"],
+                "spans": [{
+                    "traceID": t["id"],
+                    "spanID": s.get("name", ""),
+                    "operationName": s.get("name", ""),
+                    "duration": int(s.get("duration", 0) * 1000000),  # 微秒
+                    "tags": [{"key": k, "value": v} for k, v in s.get("metadata", {}).items()]
+                } for s in t.get("spans", [])],
+                "processes": {"p1": {"serviceName": "ai-hub"}}
+            })
+        return {"data": jaeger_traces}
+    
+    return {"data": traces_data}
+
+# ========== Slack 集成 ==========
+SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN", "")
+SLACK_SIGNING_SECRET = os.getenv("SLACK_SIGNING_SECRET", "")
+
+@app.post("/api/integrations/slack/webhook")
+async def slack_webhook(request: Request):
+    """Slack 事件 Webhook"""
+    body = await request.json()
+    
+    # URL 验证
+    if body.get("type") == "url_verification":
+        return {"challenge": body.get("challenge")}
+    
+    # 处理事件
+    event = body.get("event", {})
+    event_type = event.get("type")
+    
+    if event_type == "app_mention":
+        # 被 @ 提及时回复
+        channel = event.get("channel")
+        text = event.get("text", "")
+        user = event.get("user")
+        
+        # 移除 @ 提及
+        import re
+        text = re.sub(r'<@[A-Z0-9]+>', '', text).strip()
+        
+        if text and SLACK_BOT_TOKEN:
+            # 调用 AI 生成回复
+            api_key = os.getenv("OPENAI_API_KEY", "")
+            if api_key:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    ai_response = await client.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {api_key}"},
+                        json={
+                            "model": "gpt-4o-mini",
+                            "messages": [{"role": "user", "content": text}],
+                            "max_tokens": 500
+                        }
+                    )
+                    if ai_response.status_code == 200:
+                        reply = ai_response.json()["choices"][0]["message"]["content"]
+                        
+                        # 发送到 Slack
+                        await client.post(
+                            "https://slack.com/api/chat.postMessage",
+                            headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
+                            json={"channel": channel, "text": reply}
+                        )
+    
+    return {"ok": True}
+
+@app.post("/api/integrations/slack/send")
+async def send_slack_message(data: dict, user=Depends(get_current_user)):
+    """发送消息到 Slack"""
+    if not SLACK_BOT_TOKEN:
+        raise HTTPException(status_code=500, detail="Slack 未配置")
+    
+    channel = data.get("channel")
+    text = data.get("text")
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://slack.com/api/chat.postMessage",
+            headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
+            json={"channel": channel, "text": text}
+        )
+        return response.json()
+
+# ========== 飞书集成 ==========
+FEISHU_APP_ID = os.getenv("FEISHU_APP_ID", "")
+FEISHU_APP_SECRET = os.getenv("FEISHU_APP_SECRET", "")
+
+async def get_feishu_token():
+    """获取飞书 tenant_access_token"""
+    if not FEISHU_APP_ID or not FEISHU_APP_SECRET:
+        return None
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+            json={"app_id": FEISHU_APP_ID, "app_secret": FEISHU_APP_SECRET}
+        )
+        if response.status_code == 200:
+            return response.json().get("tenant_access_token")
+    return None
+
+@app.post("/api/integrations/feishu/webhook")
+async def feishu_webhook(request: Request):
+    """飞书事件 Webhook"""
+    body = await request.json()
+    
+    # URL 验证
+    if body.get("type") == "url_verification":
+        return {"challenge": body.get("challenge")}
+    
+    # 处理消息事件
+    event = body.get("event", {})
+    message = event.get("message", {})
+    
+    if message.get("message_type") == "text":
+        content = json.loads(message.get("content", "{}"))
+        text = content.get("text", "")
+        chat_id = message.get("chat_id")
+        
+        if text:
+            token = await get_feishu_token()
+            if token:
+                # 调用 AI 生成回复
+                api_key = os.getenv("OPENAI_API_KEY", "")
+                if api_key:
+                    async with httpx.AsyncClient(timeout=30) as client:
+                        ai_response = await client.post(
+                            "https://api.openai.com/v1/chat/completions",
+                            headers={"Authorization": f"Bearer {api_key}"},
+                            json={
+                                "model": "gpt-4o-mini",
+                                "messages": [{"role": "user", "content": text}],
+                                "max_tokens": 500
+                            }
+                        )
+                        if ai_response.status_code == 200:
+                            reply = ai_response.json()["choices"][0]["message"]["content"]
+                            
+                            # 发送到飞书
+                            await client.post(
+                                "https://open.feishu.cn/open-apis/im/v1/messages",
+                                headers={"Authorization": f"Bearer {token}"},
+                                params={"receive_id_type": "chat_id"},
+                                json={
+                                    "receive_id": chat_id,
+                                    "msg_type": "text",
+                                    "content": json.dumps({"text": reply})
+                                }
+                            )
+    
+    return {"ok": True}
+
+@app.post("/api/integrations/feishu/send")
+async def send_feishu_message(data: dict, user=Depends(get_current_user)):
+    """发送消息到飞书"""
+    token = await get_feishu_token()
+    if not token:
+        raise HTTPException(status_code=500, detail="飞书未配置")
+    
+    chat_id = data.get("chat_id")
+    text = data.get("text")
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://open.feishu.cn/open-apis/im/v1/messages",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"receive_id_type": "chat_id"},
+            json={
+                "receive_id": chat_id,
+                "msg_type": "text",
+                "content": json.dumps({"text": text})
+            }
+        )
+        return response.json()
+
+# ========== 灰度发布增强 ==========
+class FeatureFlags:
+    """功能开关管理"""
+    def __init__(self):
+        self.flags = {
+            "new_ui": {"enabled": False, "percentage": 10, "users": [], "groups": []},
+            "advanced_search": {"enabled": True, "percentage": 50, "users": [], "groups": []},
+            "beta_features": {"enabled": False, "percentage": 5, "users": [], "groups": []},
+            "ai_v2": {"enabled": False, "percentage": 0, "users": [], "groups": []},
+        }
+        self._load_from_db()
+    
+    def _load_from_db(self):
+        """从数据库加载配置"""
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS feature_flags (
+                        name TEXT PRIMARY KEY,
+                        config TEXT
+                    )
+                """)
+                rows = conn.execute("SELECT name, config FROM feature_flags").fetchall()
+                for name, config in rows:
+                    self.flags[name] = json.loads(config)
+        except:
+            pass
+    
+    def _save_to_db(self, name: str):
+        """保存配置到数据库"""
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO feature_flags (name, config) VALUES (?, ?)",
+                    (name, json.dumps(self.flags.get(name, {})))
+                )
+        except:
+            pass
+    
+    def is_enabled(self, feature: str, user_id: int = None, group: str = None) -> bool:
+        """检查功能是否对用户启用"""
+        flag = self.flags.get(feature)
+        if not flag or not flag.get("enabled"):
+            return False
+        
+        # 白名单用户
+        if user_id and user_id in flag.get("users", []):
+            return True
+        
+        # 白名单组
+        if group and group in flag.get("groups", []):
+            return True
+        
+        # 百分比灰度
+        if user_id:
+            return (user_id % 100) < flag.get("percentage", 0)
+        
+        return False
+    
+    def update(self, feature: str, config: dict):
+        """更新功能配置"""
+        if feature not in self.flags:
+            self.flags[feature] = {}
+        self.flags[feature].update(config)
+        self._save_to_db(feature)
+
+feature_flags = FeatureFlags()
+
+@app.get("/api/features")
+async def get_features(user=Depends(get_current_user)):
+    """获取用户可用的功能"""
+    user_id = user["id"] if user else None
+    enabled_features = {}
+    for feature in feature_flags.flags:
+        enabled_features[feature] = feature_flags.is_enabled(feature, user_id)
+    return enabled_features
+
+@app.get("/api/features/all")
+async def get_all_features(user=Depends(get_current_user)):
+    """获取所有功能配置（管理员）"""
+    return feature_flags.flags
+
+@app.post("/api/features/{feature}")
+async def update_feature(feature: str, data: dict, user=Depends(get_current_user)):
+    """更新功能配置（管理员）"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    feature_flags.update(feature, data)
+    return {"success": True, "feature": feature, "config": feature_flags.flags.get(feature)}
+
+@app.post("/api/features/{feature}/users")
+async def add_feature_user(feature: str, data: dict, user=Depends(get_current_user)):
+    """添加功能白名单用户"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    user_id = data.get("user_id")
+    if feature in feature_flags.flags and user_id:
+        if "users" not in feature_flags.flags[feature]:
+            feature_flags.flags[feature]["users"] = []
+        if user_id not in feature_flags.flags[feature]["users"]:
+            feature_flags.flags[feature]["users"].append(user_id)
+            feature_flags._save_to_db(feature)
+    
+    return {"success": True}
+
+# ========== Docker 沙箱代码执行 ==========
+DOCKER_ENABLED = os.getenv("DOCKER_SANDBOX", "false").lower() == "true"
+
+@app.post("/api/code/run-sandbox")
+async def run_code_sandbox(data: dict, user=Depends(get_current_user)):
+    """在 Docker 沙箱中运行代码"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    code = data.get("code", "")
+    language = data.get("language", "python")
+    timeout = min(data.get("timeout", 5), 30)
+    
+    if not DOCKER_ENABLED:
+        # 降级到普通执行
+        return await run_code(data, user)
+    
+    # Docker 镜像映射
+    images = {
+        "python": "python:3.11-slim",
+        "javascript": "node:20-slim",
+        "typescript": "node:20-slim",
+        "go": "golang:1.21-alpine",
+        "rust": "rust:1.74-slim",
+        "java": "openjdk:17-slim",
+    }
+    
+    image = images.get(language)
+    if not image:
+        return {"success": False, "error": f"不支持的语言: {language}", "output": ""}
+    
+    try:
+        # 创建临时文件
+        ext_map = {"python": ".py", "javascript": ".js", "typescript": ".ts", "go": ".go", "rust": ".rs", "java": ".java"}
+        ext = ext_map.get(language, ".txt")
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix=ext, delete=False, encoding='utf-8') as f:
+            f.write(code)
+            f.flush()
+            
+            # 运行命令映射
+            cmd_map = {
+                "python": f"python /code/main{ext}",
+                "javascript": f"node /code/main{ext}",
+                "typescript": f"npx ts-node /code/main{ext}",
+                "go": f"go run /code/main{ext}",
+                "rust": f"rustc /code/main{ext} -o /tmp/main && /tmp/main",
+                "java": f"cd /code && javac Main.java && java Main",
+            }
+            
+            cmd = cmd_map.get(language, f"cat /code/main{ext}")
+            
+            # Docker 运行
+            docker_cmd = [
+                "docker", "run", "--rm",
+                "--network", "none",  # 禁用网络
+                "--memory", "128m",   # 内存限制
+                "--cpus", "0.5",      # CPU 限制
+                "-v", f"{f.name}:/code/main{ext}:ro",
+                image,
+                "sh", "-c", cmd
+            ]
+            
+            result = subprocess.run(
+                docker_cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
+            
+            os.unlink(f.name)
+            
+            return {
+                "success": result.returncode == 0,
+                "output": result.stdout,
+                "error": result.stderr,
+                "sandbox": True
+            }
+    
+    except subprocess.TimeoutExpired:
+        return {"success": False, "error": "执行超时", "output": "", "sandbox": True}
+    except Exception as e:
+        return {"success": False, "error": str(e), "output": "", "sandbox": True}
+
 # ========== 笔记功能 ==========
 @app.get("/api/notes")
 async def list_notes(user=Depends(get_current_user)):
