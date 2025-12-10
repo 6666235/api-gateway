@@ -257,6 +257,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="nav-item" data-page="memory"><span class="nav-item-icon">🧠</span> 全局记忆</div>
 <div class="nav-item" data-page="api-server"><span class="nav-item-icon">🖥️</span> API 服务器</div>
 <div class="nav-item" data-page="documents"><span class="nav-item-icon">📄</span> 文档处理</div>
+<div class="nav-item" data-page="workflows"><span class="nav-item-icon">🤖</span> Agent 工作流</div>
 <div class="nav-item" data-page="prompts"><span class="nav-item-icon">📋</span> Prompt 模板</div>
 <div class="nav-item" data-page="shortcuts"><span class="nav-item-icon">⚡</span> 快捷短语</div>
 <div class="nav-item" data-page="hotkeys"><span class="nav-item-icon">⌨️</span> 快捷键</div>
@@ -837,6 +838,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 <div class="settings-section" id="docResult" style="display:none"><h4><span>📝</span> 内容</h4><div id="docContent" style="background:var(--bg);padding:16px;border-radius:8px;max-height:300px;overflow-y:auto;white-space:pre-wrap"></div><div style="margin-top:16px"><button class="btn btn-primary" onclick="summarizeDoc()">📊 摘要</button><button class="btn btn-ghost" onclick="askAboutDoc()">💬 提问</button></div></div>
 </div></div></div></div>
+<!-- Agent 工作流页 -->
+<div id="page-workflows" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>🤖</span> Agent 工作流</h4>
+<p style="color:var(--text2);margin-bottom:20px">创建多步骤自动化任务，让 AI 按流程完成复杂工作</p>
+<div id="workflowTemplates" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px"></div>
+</div>
+<div class="settings-section" id="workflowRunner" style="display:none">
+<h4><span>▶️</span> 运行工作流</h4>
+<div id="workflowInputs"></div>
+<button class="btn btn-primary" onclick="executeWorkflow()">🚀 执行</button>
+<button class="btn btn-ghost" onclick="$('workflowRunner').style.display='none'">取消</button>
+</div>
+<div class="settings-section" id="workflowResults" style="display:none">
+<h4><span>📋</span> 执行结果</h4>
+<div id="workflowResultsContent"></div>
+</div>
+</div></div></div></div>
 <!-- Prompt 模板页 -->
 <div id="page-prompts" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
 <div class="settings-section">
@@ -1132,7 +1151,7 @@ function showModal(id){$(id).classList.add('show')}
 function setAccent(c){document.documentElement.style.setProperty('--accent',c)}
 function toggleCollapse(el){var content=el.nextElementSibling;content.classList.toggle('show');el.querySelector('span:last-child').textContent=content.classList.contains('show')?'▲':'▼'}
 function api(path,options){options=options||{};var headers=Object.assign({'Content-Type':'application/json'},options.headers||{});if(authToken)headers['Authorization']='Bearer '+authToken;return fetch(path,Object.assign({},options,{headers:headers})).then(function(res){if(!res.ok)return res.json().then(function(e){throw new Error(e.detail||'Error')});return res.json()})}
-document.querySelectorAll('.nav-item[data-page]').forEach(function(n){n.onclick=function(){document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});n.classList.add('active');var page=$('page-'+n.dataset.page);if(page)page.classList.add('active');if(n.dataset.page==='stats')loadStats();if(n.dataset.page==='tokens')loadTokens();if(n.dataset.page==='teams')loadTeams();if(n.dataset.page==='knowledge')loadKnowledgeBases();closeMobileMenus()}});
+document.querySelectorAll('.nav-item[data-page]').forEach(function(n){n.onclick=function(){document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});n.classList.add('active');var page=$('page-'+n.dataset.page);if(page)page.classList.add('active');if(n.dataset.page==='stats')loadStats();if(n.dataset.page==='tokens')loadTokens();if(n.dataset.page==='teams')loadTeams();if(n.dataset.page==='knowledge')loadKnowledgeBases();if(n.dataset.page==='workflows')loadWorkflowTemplates();closeMobileMenus()}});
 function showAuthModal(){isRegisterMode=false;updateAuthUI();showModal('authModal')}
 function toggleAuthMode(){isRegisterMode=!isRegisterMode;updateAuthUI()}
 function updateAuthUI(){$('authTitle').textContent=isRegisterMode?'注册':'登录';$('authSubmit').textContent=isRegisterMode?'注册':'登录';$('authEmailGroup').style.display=isRegisterMode?'block':'none';$('authSwitch').innerHTML=isRegisterMode?'已有账号？<a href="#" onclick="toggleAuthMode()" style="color:var(--accent)">登录</a>':'没有账号？<a href="#" onclick="toggleAuthMode()" style="color:var(--accent)">注册</a>'}
@@ -1321,6 +1340,13 @@ function goToSearchResult(chatId,msgIndex){hideSearchModal();selectChat(chatId);
 // Token 估算
 function estimateTokens(){var text=$('chatInput').value;if(!text)return;fetch('/api/tokens/estimate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,model:$('chatModel').value})}).then(function(r){return r.json()}).then(function(data){showToast('预估 '+data.tokens+' tokens'+(data.estimated?' (估算)':''))}).catch(function(e){console.error(e)})}
 function showToast(msg){var toast=document.createElement('div');toast.className='toast';toast.textContent=msg;document.body.appendChild(toast);setTimeout(function(){toast.remove()},2000)}
+// Agent 工作流
+var workflowTemplates=[];
+var currentWorkflow=null;
+function loadWorkflowTemplates(){api('/api/workflows/templates').then(function(data){workflowTemplates=data;renderWorkflowTemplates()}).catch(function(e){console.error('加载工作流失败:',e)})}
+function renderWorkflowTemplates(){var html=workflowTemplates.map(function(w){return'<div style="background:var(--bg);border-radius:12px;padding:20px;cursor:pointer" onclick="selectWorkflow(\''+w.id+'\')"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><span style="font-size:24px">🤖</span><div><strong>'+w.name+'</strong><div style="font-size:12px;color:var(--text2)">'+w.steps.length+' 个步骤</div></div></div><p style="font-size:13px;color:var(--text2);line-height:1.5">'+w.description+'</p></div>'}).join('');$('workflowTemplates').innerHTML=html||'<div style="text-align:center;padding:40px;color:var(--text2)">暂无工作流模板</div>'}
+function selectWorkflow(id){currentWorkflow=workflowTemplates.find(function(w){return w.id===id});if(!currentWorkflow)return;var inputs=[];currentWorkflow.steps.forEach(function(s){var matches=s.prompt.match(/\{(\w+)\}/g);if(matches){matches.forEach(function(m){var key=m.slice(1,-1);if(!key.startsWith('result.')&&inputs.indexOf(key)===-1)inputs.push(key)})}});var html=inputs.map(function(key){return'<div class="form-group"><label>'+key+'</label><textarea id="wf_'+key+'" rows="3" placeholder="输入 '+key+'"></textarea></div>'}).join('');$('workflowInputs').innerHTML='<h5 style="margin-bottom:16px">'+currentWorkflow.name+'</h5>'+html;$('workflowRunner').style.display='block';$('workflowResults').style.display='none'}
+function executeWorkflow(){if(!currentWorkflow){alert('请先选择工作流');return}var inputData={};currentWorkflow.steps.forEach(function(s){var matches=s.prompt.match(/\{(\w+)\}/g);if(matches){matches.forEach(function(m){var key=m.slice(1,-1);if(!key.startsWith('result.')){var el=$('wf_'+key);if(el)inputData[key]=el.value}})}});$('workflowResultsContent').innerHTML='<div style="text-align:center;padding:40px"><div class="message-loading"><div class="dots"><span></span><span></span><span></span></div></div><p style="margin-top:12px;color:var(--text2)">正在执行工作流...</p></div>';$('workflowResults').style.display='block';api('/api/workflows/run',{method:'POST',body:JSON.stringify({name:currentWorkflow.name,steps:currentWorkflow.steps,input_data:inputData})}).then(function(data){var html='';for(var key in data.results){html+='<div style="background:var(--bg);border-radius:10px;padding:16px;margin-bottom:12px"><div style="font-weight:600;margin-bottom:8px;color:var(--accent)">'+key+'</div><div style="font-size:14px;line-height:1.6;white-space:pre-wrap">'+data.results[key]+'</div></div>'}$('workflowResultsContent').innerHTML=html}).catch(function(e){$('workflowResultsContent').innerHTML='<div style="color:var(--error);padding:20px">执行失败: '+e.message+'</div>'})}
 // Prompt 模板
 var promptTemplates=[];
 var currentPromptCategory='all';

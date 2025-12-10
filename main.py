@@ -1016,6 +1016,113 @@ async def search_knowledge_base(kb_id: int, q: str, user=Depends(get_current_use
         ).fetchall()
         return [dict(r) for r in rows]
 
+# ========== Agent 工作流 ==========
+class WorkflowStep(BaseModel):
+    name: str
+    prompt: str
+    model: Optional[str] = None
+    depends_on: Optional[List[str]] = None
+
+class WorkflowRequest(BaseModel):
+    name: str
+    steps: List[WorkflowStep]
+    input_data: dict
+
+@app.post("/api/workflows/run")
+async def run_workflow(request: WorkflowRequest, user=Depends(get_current_user)):
+    """执行 Agent 工作流"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    results = {}
+    
+    for step in request.steps:
+        # 检查依赖
+        if step.depends_on:
+            for dep in step.depends_on:
+                if dep not in results:
+                    raise HTTPException(status_code=400, detail=f"步骤 {step.name} 依赖的 {dep} 未完成")
+        
+        # 构建 prompt，替换变量
+        prompt = step.prompt
+        for key, value in request.input_data.items():
+            prompt = prompt.replace(f"{{{key}}}", str(value))
+        for key, value in results.items():
+            prompt = prompt.replace(f"{{result.{key}}}", str(value))
+        
+        # 调用 AI
+        model = step.model or "gpt-4o"
+        try:
+            async with httpx.AsyncClient(timeout=120) as client:
+                # 使用用户配置的第一个 provider
+                with sqlite3.connect(DB_PATH) as conn:
+                    row = conn.execute(
+                        "SELECT api_key, base_url FROM api_keys WHERE user_id = ? AND is_active = 1 LIMIT 1",
+                        (user["id"],)
+                    ).fetchone()
+                
+                if row:
+                    api_key = decrypt_api_key(row[0]) if row[0] else ""
+                    base_url = row[1] or "https://api.openai.com/v1"
+                else:
+                    api_key = os.getenv("OPENAI_API_KEY", "")
+                    base_url = "https://api.openai.com/v1"
+                
+                response = await client.post(
+                    f"{base_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "stream": False
+                    }
+                )
+                response.raise_for_status()
+                data = response.json()
+                content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                results[step.name] = content
+        except Exception as e:
+            results[step.name] = f"Error: {str(e)}"
+    
+    return {"workflow": request.name, "results": results}
+
+# 预设工作流模板
+WORKFLOW_TEMPLATES = [
+    {
+        "id": "translate_review",
+        "name": "翻译+审校",
+        "description": "先翻译，再审校润色",
+        "steps": [
+            {"name": "translate", "prompt": "将以下内容翻译成{target_lang}：\n\n{content}"},
+            {"name": "review", "prompt": "请审校以下翻译，修正错误并润色：\n\n{result.translate}", "depends_on": ["translate"]}
+        ]
+    },
+    {
+        "id": "code_review",
+        "name": "代码审查+优化",
+        "description": "审查代码问题，然后给出优化建议",
+        "steps": [
+            {"name": "review", "prompt": "审查以下代码的问题：\n\n{code}"},
+            {"name": "optimize", "prompt": "基于以下审查结果，给出优化后的代码：\n\n审查结果：{result.review}\n\n原代码：{code}", "depends_on": ["review"]}
+        ]
+    },
+    {
+        "id": "content_pipeline",
+        "name": "内容创作流水线",
+        "description": "大纲→初稿→润色",
+        "steps": [
+            {"name": "outline", "prompt": "为主题「{topic}」创建一个详细大纲"},
+            {"name": "draft", "prompt": "根据以下大纲写一篇文章：\n\n{result.outline}", "depends_on": ["outline"]},
+            {"name": "polish", "prompt": "润色以下文章，使其更加流畅专业：\n\n{result.draft}", "depends_on": ["draft"]}
+        ]
+    }
+]
+
+@app.get("/api/workflows/templates")
+async def get_workflow_templates():
+    """获取预设工作流模板"""
+    return WORKFLOW_TEMPLATES
+
 # ========== 笔记功能 ==========
 @app.get("/api/notes")
 async def list_notes(user=Depends(get_current_user)):
