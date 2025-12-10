@@ -254,6 +254,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="nav-item" data-page="memory"><span class="nav-item-icon">🧠</span> 全局记忆</div>
 <div class="nav-item" data-page="api-server"><span class="nav-item-icon">🖥️</span> API 服务器</div>
 <div class="nav-item" data-page="documents"><span class="nav-item-icon">📄</span> 文档处理</div>
+<div class="nav-item" data-page="prompts"><span class="nav-item-icon">📋</span> Prompt 模板</div>
 <div class="nav-item" data-page="shortcuts"><span class="nav-item-icon">⚡</span> 快捷短语</div>
 <div class="nav-item" data-page="hotkeys"><span class="nav-item-icon">⌨️</span> 快捷键</div>
 </div>
@@ -768,6 +769,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 <div class="settings-section" id="docResult" style="display:none"><h4><span>📝</span> 内容</h4><div id="docContent" style="background:var(--bg);padding:16px;border-radius:8px;max-height:300px;overflow-y:auto;white-space:pre-wrap"></div><div style="margin-top:16px"><button class="btn btn-primary" onclick="summarizeDoc()">📊 摘要</button><button class="btn btn-ghost" onclick="askAboutDoc()">💬 提问</button></div></div>
 </div></div></div></div>
+<!-- Prompt 模板页 -->
+<div id="page-prompts" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+<h4 style="margin:0"><span>📋</span> Prompt 模板库</h4>
+<button class="btn btn-primary btn-sm" onclick="showAddPromptModal()">+ 新建模板</button>
+</div>
+<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+<button class="btn btn-ghost btn-sm prompt-cat-btn active" onclick="filterPrompts('all',this)">全部</button>
+<button class="btn btn-ghost btn-sm prompt-cat-btn" onclick="filterPrompts('writing',this)">✍️ 写作</button>
+<button class="btn btn-ghost btn-sm prompt-cat-btn" onclick="filterPrompts('coding',this)">💻 编程</button>
+<button class="btn btn-ghost btn-sm prompt-cat-btn" onclick="filterPrompts('translate',this)">🌐 翻译</button>
+<button class="btn btn-ghost btn-sm prompt-cat-btn" onclick="filterPrompts('analysis',this)">📊 分析</button>
+<button class="btn btn-ghost btn-sm prompt-cat-btn" onclick="filterPrompts('creative',this)">🎨 创意</button>
+</div>
+<div id="promptList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px"></div>
+</div>
+</div></div></div></div>
 <!-- 快捷短语页 -->
 <div id="page-shortcuts" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
 <div class="settings-section" style="padding:16px">
@@ -1201,7 +1220,7 @@ function testLocalGit(){var path=$('localGitPath').value.trim();if(!path){alert(
 function pushToLocalGit(content,filename,message){if(!localGitSettings.repoPath){alert('请先在数据设置中配置本地 Git 仓库路径');return}var filePath=prompt('文件路径:',filename||'code.txt');if(!filePath)return;var commitMsg=prompt('提交信息:',message||'Add code from AI Hub');if(!commitMsg)return;fetch('/api/git/local/push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({repo_path:localGitSettings.repoPath,file_path:filePath,content:content,commit_message:commitMsg})}).then(function(r){return r.json()}).then(function(data){if(data.success){alert('✓ '+data.message)}else{alert('✗ 失败: '+(data.detail||data.error||'未知错误'))}}).catch(function(e){alert('✗ 失败: '+e.message)})}
 // 初始化
 marked.setOptions({breaks:true,highlight:function(code,lang){return lang&&hljs.getLanguage(lang)?hljs.highlight(code,{language:lang}).value:code}});
-renderProviders();if(providers.length)selectProvider(providers[0].id);updateChatProviders();initDefaultModelSelects();initCompareModels();renderAssistants();if(assistants.length)selectAssistant(assistants[0].id);renderChats();if(chats.length===0)newChat();else selectChat(chats[0].id);renderShortcuts();renderNotes();renderMemories();checkAuth();updateStats();loadGithubSettings();loadLocalGitSettings();
+renderProviders();if(providers.length)selectProvider(providers[0].id);updateChatProviders();initDefaultModelSelects();initCompareModels();loadPrompts();renderAssistants();if(assistants.length)selectAssistant(assistants[0].id);renderChats();if(chats.length===0)newChat();else selectChat(chats[0].id);renderShortcuts();renderNotes();renderMemories();checkAuth();updateStats();loadGithubSettings();loadLocalGitSettings();
 // 快捷键
 document.addEventListener('keydown',function(e){
 if((e.ctrlKey||e.metaKey)&&e.key==='n'){e.preventDefault();newChat();showToast('新建对话')}
@@ -1225,6 +1244,20 @@ function goToSearchResult(chatId,msgIndex){hideSearchModal();selectChat(chatId);
 // Token 估算
 function estimateTokens(){var text=$('chatInput').value;if(!text)return;fetch('/api/tokens/estimate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,model:$('chatModel').value})}).then(function(r){return r.json()}).then(function(data){showToast('预估 '+data.tokens+' tokens'+(data.estimated?' (估算)':''))}).catch(function(e){console.error(e)})}
 function showToast(msg){var toast=document.createElement('div');toast.className='toast';toast.textContent=msg;document.body.appendChild(toast);setTimeout(function(){toast.remove()},2000)}
+// Prompt 模板
+var promptTemplates=[];
+var currentPromptCategory='all';
+function loadPrompts(){api('/api/prompts').then(function(data){promptTemplates=data;renderPrompts()}).catch(function(e){console.error('加载模板失败:',e)})}
+function renderPrompts(){var filtered=currentPromptCategory==='all'?promptTemplates:promptTemplates.filter(function(p){return p.category===currentPromptCategory});if(filtered.length===0){$('promptList').innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text2)"><span style="font-size:48px;display:block;margin-bottom:16px">📋</span><p>暂无模板</p><p style="font-size:12px;margin-top:8px">点击右上角新建模板</p></div>';return}var html=filtered.map(function(p){return'<div style="background:var(--bg);border-radius:12px;padding:16px;cursor:pointer" onclick="usePrompt('+p.id+')" oncontextmenu="showPromptMenu(event,'+p.id+')"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><strong style="font-size:14px">'+p.name+'</strong><span style="font-size:11px;padding:2px 8px;background:var(--bg3);border-radius:4px">'+getCategoryEmoji(p.category)+'</span></div><div style="font-size:13px;color:var(--text2);line-height:1.5;max-height:60px;overflow:hidden">'+p.content.slice(0,100)+'...</div><div style="margin-top:12px;font-size:11px;color:var(--text2)">使用 '+p.use_count+' 次</div></div>'}).join('');$('promptList').innerHTML=html}
+function getCategoryEmoji(cat){var map={writing:'✍️',coding:'💻',translate:'🌐',analysis:'📊',creative:'🎨',general:'📋'};return map[cat]||'📋'}
+function filterPrompts(cat,btn){currentPromptCategory=cat;document.querySelectorAll('.prompt-cat-btn').forEach(function(b){b.classList.remove('active')});if(btn)btn.classList.add('active');renderPrompts()}
+function usePrompt(id){var p=promptTemplates.find(function(x){return x.id===id});if(!p)return;$('chatInput').value=p.content;document.querySelector('.nav-item[data-page="chat"]').click();$('chatInput').focus();fetch('/api/prompts/'+id+'/use',{method:'POST'});showToast('已应用模板')}
+function showAddPromptModal(){var html='<div class="form-group"><label>名称</label><input type="text" id="promptName" placeholder="模板名称"></div><div class="form-group"><label>分类</label><select id="promptCategory"><option value="general">通用</option><option value="writing">写作</option><option value="coding">编程</option><option value="translate">翻译</option><option value="analysis">分析</option><option value="creative">创意</option></select></div><div class="form-group"><label>内容</label><textarea id="promptContent" rows="6" placeholder="输入 Prompt 内容..."></textarea></div><div style="display:flex;gap:12px"><button class="btn btn-primary" onclick="savePrompt()">保存</button><button class="btn btn-ghost" onclick="closeModal(\'promptModal\')">取消</button></div>';showCustomModal('新建 Prompt 模板',html,'promptModal')}
+function savePrompt(){var name=$('promptName').value.trim(),content=$('promptContent').value.trim(),category=$('promptCategory').value;if(!name||!content){alert('请填写名称和内容');return}api('/api/prompts',{method:'POST',body:JSON.stringify({name:name,content:content,category:category})}).then(function(){closeModal('promptModal');loadPrompts();showToast('模板已保存')}).catch(function(e){alert('保存失败: '+e.message)})}
+function showCustomModal(title,content,id){var modal=document.createElement('div');modal.id=id;modal.className='modal show';modal.innerHTML='<div class="modal-content"><div class="modal-header"><h3>'+title+'</h3><span style="cursor:pointer;font-size:20px" onclick="closeModal(\''+id+'\')">&times;</span></div><div class="modal-body">'+content+'</div></div>';document.body.appendChild(modal)}
+function closeModal(id){var m=document.getElementById(id);if(m)m.remove()}
+function showPromptMenu(e,id){e.preventDefault();var menu=document.createElement('div');menu.className='context-menu';menu.innerHTML='<div onclick="editPrompt('+id+')">✏️ 编辑</div><div onclick="deletePrompt('+id+')" style="color:var(--error)">🗑️ 删除</div>';menu.style.cssText='position:fixed;left:'+e.clientX+'px;top:'+e.clientY+'px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:4px;z-index:1000;min-width:100px';document.body.appendChild(menu);setTimeout(function(){document.addEventListener('click',function handler(){menu.remove();document.removeEventListener('click',handler)})},0)}
+function deletePrompt(id){if(!confirm('确定删除？'))return;api('/api/prompts/'+id,{method:'DELETE'}).then(function(){loadPrompts();showToast('已删除')}).catch(function(e){alert('删除失败: '+e.message)})}
 // 模型对比
 var selectedCompareModels=[];
 function initCompareModels(){var html='';providers.forEach(function(p){if(p.models&&p.models.length>0){p.models.slice(0,5).forEach(function(m){var id=p.id+'_'+m.id;var checked=selectedCompareModels.includes(id)?'checked':'';html+='<label style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--bg);border-radius:8px;cursor:pointer;font-size:13px"><input type="checkbox" onchange="toggleCompareModel(\''+p.id+'\',\''+m.id+'\',\''+p.url+'\',\''+p.key+'\')" '+checked+'><span>'+p.name+'/'+m.name+'</span></label>'})}});$('compareModelList').innerHTML=html||'<span style="color:var(--text2)">请先在模型服务中添加模型</span>'}

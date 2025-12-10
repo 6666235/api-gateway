@@ -302,6 +302,27 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
         ''')
+    
+    # 添加预设 Prompt 模板
+    with sqlite3.connect(DB_PATH) as conn:
+        count = conn.execute("SELECT COUNT(*) FROM prompt_templates WHERE user_id = 0").fetchone()[0]
+        if count == 0:
+            default_prompts = [
+                ("翻译助手", "请将以下内容翻译成{目标语言}，保持原文的语气和风格：\n\n{内容}", "translate", 1),
+                ("代码审查", "请审查以下代码，指出潜在的问题、性能优化建议和最佳实践改进：\n\n```\n{代码}\n```", "coding", 1),
+                ("文章摘要", "请用3-5个要点总结以下文章的核心内容：\n\n{文章内容}", "analysis", 1),
+                ("创意写作", "请以{主题}为题，写一篇{字数}字左右的{文体}，要求{要求}", "creative", 1),
+                ("SQL生成", "根据以下需求生成SQL查询语句：\n\n表结构：{表结构}\n需求：{需求}", "coding", 1),
+                ("邮件润色", "请帮我润色以下邮件，使其更加专业和礼貌：\n\n{邮件内容}", "writing", 1),
+                ("解释概念", "请用简单易懂的语言解释{概念}，并举一个生活中的例子", "general", 1),
+                ("Bug修复", "以下代码有bug，请找出问题并修复：\n\n```\n{代码}\n```\n\n错误信息：{错误}", "coding", 1),
+            ]
+            for name, content, category, is_public in default_prompts:
+                conn.execute(
+                    "INSERT INTO prompt_templates (user_id, name, content, category, is_public) VALUES (0, ?, ?, ?, ?)",
+                    (name, content, category, is_public)
+                )
+            logger.info("Added default prompt templates")
 
 init_db()
 
