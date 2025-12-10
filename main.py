@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException, Header, Depends, Request
+from fastapi import FastAPI, HTTPException, Header, Depends, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
+from fastapi.responses import StreamingResponse, FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -13,6 +13,9 @@ import secrets
 import time
 import base64
 import logging
+import pyotp
+import qrcode
+import io
 from datetime import datetime, timedelta
 from typing import Optional, AsyncGenerator, List, Dict, Any
 from contextlib import contextmanager
@@ -24,6 +27,10 @@ import threading
 from queue import Queue
 
 load_dotenv()
+
+# OAuth 配置
+GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
+GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
 
 # ========== 日志配置 ==========
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
@@ -187,6 +194,11 @@ def init_db():
                 plan TEXT DEFAULT 'free',
                 tokens_used INTEGER DEFAULT 0,
                 tokens_limit INTEGER DEFAULT 10000,
+                totp_secret TEXT,
+                totp_enabled INTEGER DEFAULT 0,
+                github_id TEXT,
+                avatar_url TEXT,
+                locale TEXT DEFAULT 'zh-CN',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 expires_at TIMESTAMP
             );
@@ -1794,6 +1806,255 @@ async def local_git_test(data: dict):
         return {"success": True, "remotes": remotes if remotes else "无远程仓库"}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+# ========== WebSocket 实时通信 ==========
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, WebSocket] = {}
+    
+    async def connect(self, websocket: WebSocket, user_id: str):
+        await websocket.accept()
+        self.active_connections[user_id] = websocket
+        logger.info(f"WebSocket connected: {user_id}")
+    
+    def disconnect(self, user_id: str):
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+            logger.info(f"WebSocket disconnected: {user_id}")
+    
+    async def send_message(self, user_id: str, message: dict):
+        if user_id in self.active_connections:
+            await self.active_connections[user_id].send_json(message)
+    
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections.values():
+            await connection.send_json(message)
+
+ws_manager = ConnectionManager()
+
+@app.websocket("/ws/{token}")
+async def websocket_endpoint(websocket: WebSocket, token: str):
+    # 验证 token
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT u.id FROM users u JOIN sessions s ON u.id = s.user_id WHERE s.token = ? AND s.expires_at > ?",
+            (token, datetime.now())
+        ).fetchone()
+        if not row:
+            await websocket.close(code=4001)
+            return
+        user_id = str(row["id"])
+    
+    await ws_manager.connect(websocket, user_id)
+    try:
+        while True:
+            data = await websocket.receive_json()
+            # 处理不同类型的消息
+            msg_type = data.get("type")
+            if msg_type == "ping":
+                await websocket.send_json({"type": "pong"})
+            elif msg_type == "chat":
+                # 可以在这里处理实时聊天
+                pass
+    except WebSocketDisconnect:
+        ws_manager.disconnect(user_id)
+
+# ========== GitHub OAuth ==========
+@app.get("/api/auth/github")
+async def github_auth():
+    """重定向到 GitHub 授权页面"""
+    if not GITHUB_CLIENT_ID:
+        raise HTTPException(status_code=500, detail="GitHub OAuth 未配置")
+    redirect_uri = os.getenv("GITHUB_REDIRECT_URI", "http://localhost:8000/api/auth/github/callback")
+    return RedirectResponse(
+        f"https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&redirect_uri={redirect_uri}&scope=user:email"
+    )
+
+@app.get("/api/auth/github/callback")
+async def github_callback(code: str):
+    """GitHub OAuth 回调"""
+    if not GITHUB_CLIENT_ID or not GITHUB_CLIENT_SECRET:
+        raise HTTPException(status_code=500, detail="GitHub OAuth 未配置")
+    
+    async with httpx.AsyncClient() as client:
+        # 获取 access token
+        token_resp = await client.post(
+            "https://github.com/login/oauth/access_token",
+            data={
+                "client_id": GITHUB_CLIENT_ID,
+                "client_secret": GITHUB_CLIENT_SECRET,
+                "code": code
+            },
+            headers={"Accept": "application/json"}
+        )
+        token_data = token_resp.json()
+        access_token = token_data.get("access_token")
+        
+        if not access_token:
+            raise HTTPException(status_code=400, detail="获取 token 失败")
+        
+        # 获取用户信息
+        user_resp = await client.get(
+            "https://api.github.com/user",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        github_user = user_resp.json()
+    
+    github_id = str(github_user.get("id"))
+    username = github_user.get("login")
+    email = github_user.get("email")
+    avatar = github_user.get("avatar_url")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        # 查找或创建用户
+        user = conn.execute("SELECT * FROM users WHERE github_id = ?", (github_id,)).fetchone()
+        if not user:
+            # 创建新用户
+            conn.execute(
+                "INSERT INTO users (username, password_hash, email, github_id, avatar_url) VALUES (?, ?, ?, ?, ?)",
+                (f"gh_{username}", "", email, github_id, avatar)
+            )
+            user = conn.execute("SELECT * FROM users WHERE github_id = ?", (github_id,)).fetchone()
+        
+        # 创建 session
+        token = secrets.token_hex(32)
+        expires = datetime.now() + timedelta(days=30)
+        conn.execute("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)", (token, user["id"], expires))
+    
+    # 重定向回前端，带上 token
+    return RedirectResponse(f"/?token={token}")
+
+# ========== 2FA 双因素认证 ==========
+@app.post("/api/auth/2fa/setup")
+async def setup_2fa(user=Depends(get_current_user)):
+    """设置 2FA"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    # 生成 TOTP 密钥
+    secret = pyotp.random_base32()
+    totp = pyotp.TOTP(secret)
+    
+    # 生成二维码
+    provisioning_uri = totp.provisioning_uri(user["username"], issuer_name="AI Hub")
+    
+    # 保存密钥（未启用状态）
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("UPDATE users SET totp_secret = ? WHERE id = ?", (secret, user["id"]))
+    
+    # 生成二维码图片
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(provisioning_uri)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    qr_base64 = base64.b64encode(buffer.getvalue()).decode()
+    
+    return {
+        "secret": secret,
+        "qr_code": f"data:image/png;base64,{qr_base64}",
+        "uri": provisioning_uri
+    }
+
+@app.post("/api/auth/2fa/verify")
+async def verify_2fa(data: dict, user=Depends(get_current_user)):
+    """验证并启用 2FA"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    code = data.get("code")
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute("SELECT totp_secret FROM users WHERE id = ?", (user["id"],)).fetchone()
+        if not row or not row[0]:
+            raise HTTPException(status_code=400, detail="请先设置 2FA")
+        
+        totp = pyotp.TOTP(row[0])
+        if totp.verify(code):
+            conn.execute("UPDATE users SET totp_enabled = 1 WHERE id = ?", (user["id"],))
+            return {"success": True, "message": "2FA 已启用"}
+        else:
+            raise HTTPException(status_code=400, detail="验证码错误")
+
+@app.post("/api/auth/2fa/disable")
+async def disable_2fa(data: dict, user=Depends(get_current_user)):
+    """禁用 2FA"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    code = data.get("code")
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute("SELECT totp_secret FROM users WHERE id = ?", (user["id"],)).fetchone()
+        if row and row[0]:
+            totp = pyotp.TOTP(row[0])
+            if totp.verify(code):
+                conn.execute("UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = ?", (user["id"],))
+                return {"success": True, "message": "2FA 已禁用"}
+        raise HTTPException(status_code=400, detail="验证码错误")
+
+# ========== 国际化 ==========
+I18N = {
+    "zh-CN": {
+        "welcome": "欢迎使用 AI Hub",
+        "login": "登录",
+        "register": "注册",
+        "logout": "退出",
+        "settings": "设置",
+        "chat": "对话",
+        "new_chat": "新建对话",
+        "send": "发送",
+        "copy": "复制",
+        "delete": "删除",
+        "export": "导出",
+        "share": "分享",
+    },
+    "en": {
+        "welcome": "Welcome to AI Hub",
+        "login": "Login",
+        "register": "Register",
+        "logout": "Logout",
+        "settings": "Settings",
+        "chat": "Chat",
+        "new_chat": "New Chat",
+        "send": "Send",
+        "copy": "Copy",
+        "delete": "Delete",
+        "export": "Export",
+        "share": "Share",
+    },
+    "ja": {
+        "welcome": "AI Hub へようこそ",
+        "login": "ログイン",
+        "register": "登録",
+        "logout": "ログアウト",
+        "settings": "設定",
+        "chat": "チャット",
+        "new_chat": "新規チャット",
+        "send": "送信",
+        "copy": "コピー",
+        "delete": "削除",
+        "export": "エクスポート",
+        "share": "共有",
+    }
+}
+
+@app.get("/api/i18n/{locale}")
+async def get_i18n(locale: str):
+    """获取国际化文本"""
+    return I18N.get(locale, I18N["zh-CN"])
+
+@app.put("/api/user/locale")
+async def update_locale(data: dict, user=Depends(get_current_user)):
+    """更新用户语言设置"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    locale = data.get("locale", "zh-CN")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("UPDATE users SET locale = ? WHERE id = ?", (locale, user["id"]))
+    return {"success": True}
 
 # ========== 静态文件 ==========
 import pathlib
