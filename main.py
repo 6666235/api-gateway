@@ -301,6 +301,71 @@ def init_db():
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id),
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
+            CREATE TABLE IF NOT EXISTS message_ratings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                conversation_id TEXT,
+                message_index INTEGER,
+                rating INTEGER,
+                model TEXT,
+                feedback TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+            CREATE TABLE IF NOT EXISTS teams (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                owner_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (owner_id) REFERENCES users(id)
+            );
+            CREATE TABLE IF NOT EXISTS team_members (
+                team_id INTEGER,
+                user_id INTEGER,
+                role TEXT DEFAULT 'member',
+                joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (team_id, user_id),
+                FOREIGN KEY (team_id) REFERENCES teams(id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+            CREATE TABLE IF NOT EXISTS api_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                name TEXT,
+                token TEXT UNIQUE,
+                permissions TEXT DEFAULT '[]',
+                last_used TIMESTAMP,
+                expires_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                action TEXT,
+                resource TEXT,
+                details TEXT,
+                ip_address TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+            CREATE TABLE IF NOT EXISTS knowledge_bases (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                name TEXT,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+            CREATE TABLE IF NOT EXISTS knowledge_documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kb_id INTEGER,
+                filename TEXT,
+                content TEXT,
+                embedding TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (kb_id) REFERENCES knowledge_bases(id)
+            );
         ''')
     
     # 添加预设 Prompt 模板
@@ -763,6 +828,181 @@ async def get_shared_conversation(share_id: str):
             "messages": [dict(m) for m in messages],
             "view_count": share["view_count"] + 1
         }
+
+# ========== 消息评分 ==========
+@app.post("/api/ratings")
+async def create_rating(data: dict, user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO message_ratings (user_id, conversation_id, message_index, rating, model, feedback) VALUES (?, ?, ?, ?, ?, ?)",
+            (user["id"], data.get("conversation_id"), data.get("message_index"), data.get("rating"), data.get("model"), data.get("feedback"))
+        )
+    logger.info(f"User {user['id']} rated message: {data.get('rating')} stars")
+    return {"success": True}
+
+@app.get("/api/ratings/stats")
+async def rating_stats(user=Depends(get_current_user)):
+    """获取评分统计"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        stats = conn.execute("""
+            SELECT model, AVG(rating) as avg_rating, COUNT(*) as count 
+            FROM message_ratings WHERE user_id = ? 
+            GROUP BY model ORDER BY avg_rating DESC
+        """, (user["id"],)).fetchall()
+        return [dict(r) for r in stats]
+
+# ========== 团队空间 ==========
+@app.post("/api/teams")
+async def create_team(data: dict, user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.execute("INSERT INTO teams (name, owner_id) VALUES (?, ?)", (data.get("name"), user["id"]))
+        team_id = cursor.lastrowid
+        conn.execute("INSERT INTO team_members (team_id, user_id, role) VALUES (?, ?, 'owner')", (team_id, user["id"]))
+    return {"id": team_id, "success": True}
+
+@app.get("/api/teams")
+async def list_teams(user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT t.*, tm.role FROM teams t 
+            JOIN team_members tm ON t.id = tm.team_id 
+            WHERE tm.user_id = ?
+        """, (user["id"],)).fetchall()
+        return [dict(r) for r in rows]
+
+@app.post("/api/teams/{team_id}/members")
+async def add_team_member(team_id: int, data: dict, user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    with sqlite3.connect(DB_PATH) as conn:
+        # 检查权限
+        role = conn.execute("SELECT role FROM team_members WHERE team_id = ? AND user_id = ?", (team_id, user["id"])).fetchone()
+        if not role or role[0] not in ['owner', 'admin']:
+            raise HTTPException(status_code=403, detail="无权限")
+        conn.execute("INSERT INTO team_members (team_id, user_id, role) VALUES (?, ?, ?)", 
+                     (team_id, data.get("user_id"), data.get("role", "member")))
+    return {"success": True}
+
+# ========== API Token ==========
+@app.post("/api/tokens")
+async def create_api_token(data: dict, user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    token = f"sk-{secrets.token_hex(24)}"
+    expires = datetime.now() + timedelta(days=data.get("expires_days", 30))
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO api_tokens (user_id, name, token, permissions, expires_at) VALUES (?, ?, ?, ?, ?)",
+            (user["id"], data.get("name", "API Token"), token, json.dumps(data.get("permissions", [])), expires)
+        )
+    return {"token": token, "expires_at": expires.isoformat()}
+
+@app.get("/api/tokens")
+async def list_api_tokens(user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT id, name, token, permissions, last_used, expires_at, created_at FROM api_tokens WHERE user_id = ?",
+            (user["id"],)
+        ).fetchall()
+        # 隐藏 token 中间部分
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["token"] = d["token"][:10] + "..." + d["token"][-4:]
+            result.append(d)
+        return result
+
+@app.delete("/api/tokens/{token_id}")
+async def delete_api_token(token_id: int, user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM api_tokens WHERE id = ? AND user_id = ?", (token_id, user["id"]))
+    return {"success": True}
+
+# ========== 审计日志 ==========
+def log_audit(user_id: int, action: str, resource: str, details: str = "", ip: str = ""):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO audit_logs (user_id, action, resource, details, ip_address) VALUES (?, ?, ?, ?, ?)",
+            (user_id, action, resource, details, ip)
+        )
+
+@app.get("/api/audit-logs")
+async def get_audit_logs(limit: int = 100, user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM audit_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            (user["id"], limit)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+# ========== 知识库 ==========
+@app.post("/api/knowledge-bases")
+async def create_knowledge_base(data: dict, user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.execute(
+            "INSERT INTO knowledge_bases (user_id, name, description) VALUES (?, ?, ?)",
+            (user["id"], data.get("name"), data.get("description", ""))
+        )
+    return {"id": cursor.lastrowid, "success": True}
+
+@app.get("/api/knowledge-bases")
+async def list_knowledge_bases(user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM knowledge_bases WHERE user_id = ?", (user["id"],)).fetchall()
+        return [dict(r) for r in rows]
+
+@app.post("/api/knowledge-bases/{kb_id}/documents")
+async def upload_kb_document(kb_id: int, request: Request, user=Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    form = await request.form()
+    file = form.get("file")
+    if not file:
+        raise HTTPException(status_code=400, detail="请上传文件")
+    content = await file.read()
+    text = content.decode('utf-8', errors='ignore')
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO knowledge_documents (kb_id, filename, content) VALUES (?, ?, ?)",
+            (kb_id, file.filename, text[:50000])  # 限制大小
+        )
+    return {"success": True, "filename": file.filename}
+
+@app.get("/api/knowledge-bases/{kb_id}/search")
+async def search_knowledge_base(kb_id: int, q: str, user=Depends(get_current_user)):
+    """简单的知识库搜索"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM knowledge_documents WHERE kb_id = ? AND content LIKE ? LIMIT 10",
+            (kb_id, f"%{q}%")
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 # ========== 笔记功能 ==========
 @app.get("/api/notes")
