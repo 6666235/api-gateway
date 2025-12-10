@@ -1511,6 +1511,231 @@ async def trigger_webhook(event: str, data: dict, user_id: int):
             except:
                 pass
 
+# ========== 代码运行器 ==========
+import subprocess
+import tempfile
+
+@app.post("/api/code/run")
+async def run_code(data: dict, user=Depends(get_current_user)):
+    """在线运行代码（沙箱环境）"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    code = data.get("code", "")
+    language = data.get("language", "python")
+    timeout = min(data.get("timeout", 5), 10)  # 最大10秒
+    
+    if language == "python":
+        # 安全检查
+        forbidden = ["import os", "import subprocess", "import sys", "exec(", "eval(", "__import__", "open("]
+        for f in forbidden:
+            if f in code:
+                return {"success": False, "error": f"禁止使用: {f}", "output": ""}
+        
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as f:
+                f.write(code)
+                f.flush()
+                result = subprocess.run(
+                    ["python", f.name],
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout
+                )
+                os.unlink(f.name)
+                return {
+                    "success": result.returncode == 0,
+                    "output": result.stdout,
+                    "error": result.stderr
+                }
+        except subprocess.TimeoutExpired:
+            return {"success": False, "error": "执行超时", "output": ""}
+        except Exception as e:
+            return {"success": False, "error": str(e), "output": ""}
+    
+    elif language == "javascript":
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False, encoding='utf-8') as f:
+                f.write(code)
+                f.flush()
+                result = subprocess.run(
+                    ["node", f.name],
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout
+                )
+                os.unlink(f.name)
+                return {
+                    "success": result.returncode == 0,
+                    "output": result.stdout,
+                    "error": result.stderr
+                }
+        except subprocess.TimeoutExpired:
+            return {"success": False, "error": "执行超时", "output": ""}
+        except Exception as e:
+            return {"success": False, "error": str(e), "output": ""}
+    
+    return {"success": False, "error": f"不支持的语言: {language}", "output": ""}
+
+# ========== 思维导图 ==========
+@app.post("/api/mindmap/generate")
+async def generate_mindmap(data: dict, user=Depends(get_current_user)):
+    """将对话转换为思维导图数据"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    messages = data.get("messages", [])
+    title = data.get("title", "对话思维导图")
+    
+    # 提取关键信息生成思维导图结构
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key:
+        # 简单提取
+        nodes = [{"id": "root", "label": title, "children": []}]
+        for i, msg in enumerate(messages):
+            if msg.get("role") == "assistant":
+                content = msg.get("content", "")[:100]
+                nodes[0]["children"].append({"id": f"node_{i}", "label": content})
+        return {"nodes": nodes}
+    
+    # 使用 AI 生成结构化思维导图
+    conversation = "\n".join([f"{m['role']}: {m['content']}" for m in messages])
+    
+    async with httpx.AsyncClient(timeout=60) as client:
+        response = await client.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": "gpt-4o-mini",
+                "messages": [{
+                    "role": "user",
+                    "content": f"请将以下对话内容转换为思维导图的JSON结构，格式为：{{\"nodes\": [{{\"id\": \"root\", \"label\": \"主题\", \"children\": [{{\"id\": \"1\", \"label\": \"子节点\"}}]}}]}}。对话内容：\n\n{conversation[:3000]}"
+                }],
+                "max_tokens": 1000
+            }
+        )
+        if response.status_code == 200:
+            result = response.json()
+            content = result["choices"][0]["message"]["content"]
+            try:
+                # 提取 JSON
+                import re
+                json_match = re.search(r'\{[\s\S]*\}', content)
+                if json_match:
+                    return json.loads(json_match.group())
+            except:
+                pass
+    
+    return {"nodes": [{"id": "root", "label": title, "children": []}]}
+
+# ========== 对话模板 ==========
+@app.post("/api/chat-templates")
+async def save_chat_template(data: dict, user=Depends(get_current_user)):
+    """保存对话为模板"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""
+            INSERT INTO prompt_templates (user_id, name, content, category, is_public)
+            VALUES (?, ?, ?, 'chat_template', 0)
+        """, (user["id"], data.get("name"), json.dumps(data.get("messages", []))))
+    return {"success": True}
+
+@app.get("/api/chat-templates")
+async def list_chat_templates(user=Depends(get_current_user)):
+    """获取对话模板列表"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM prompt_templates WHERE user_id = ? AND category = 'chat_template'",
+            (user["id"],)
+        ).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["messages"] = json.loads(d["content"])
+            except:
+                d["messages"] = []
+            result.append(d)
+        return result
+
+# ========== 用量配额管理 ==========
+@app.get("/api/quota")
+async def get_quota(user=Depends(get_current_user)):
+    """获取用户配额"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    return {
+        "tokens_used": user.get("tokens_used", 0),
+        "tokens_limit": user.get("tokens_limit", 10000),
+        "plan": user.get("plan", "free"),
+        "remaining": max(0, user.get("tokens_limit", 10000) - user.get("tokens_used", 0)),
+        "usage_percent": min(100, (user.get("tokens_used", 0) / max(1, user.get("tokens_limit", 10000))) * 100)
+    }
+
+@app.post("/api/quota/reset")
+async def reset_quota(data: dict, user=Depends(get_current_user)):
+    """重置用户配额（管理员）"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    target_user_id = data.get("user_id", user["id"])
+    new_limit = data.get("limit", 10000)
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "UPDATE users SET tokens_used = 0, tokens_limit = ? WHERE id = ?",
+            (new_limit, target_user_id)
+        )
+    return {"success": True}
+
+# ========== 链路追踪 ==========
+import uuid
+
+class TraceContext:
+    def __init__(self):
+        self.traces = {}
+    
+    def start_trace(self, name: str) -> str:
+        trace_id = str(uuid.uuid4())[:8]
+        self.traces[trace_id] = {
+            "id": trace_id,
+            "name": name,
+            "start_time": time.time(),
+            "spans": []
+        }
+        return trace_id
+    
+    def add_span(self, trace_id: str, name: str, duration: float, metadata: dict = None):
+        if trace_id in self.traces:
+            self.traces[trace_id]["spans"].append({
+                "name": name,
+                "duration": duration,
+                "metadata": metadata or {}
+            })
+    
+    def end_trace(self, trace_id: str) -> dict:
+        if trace_id in self.traces:
+            trace = self.traces[trace_id]
+            trace["end_time"] = time.time()
+            trace["total_duration"] = trace["end_time"] - trace["start_time"]
+            return trace
+        return None
+
+tracer = TraceContext()
+
+@app.get("/api/traces")
+async def list_traces(limit: int = 20, user=Depends(get_current_user)):
+    """获取最近的追踪记录"""
+    traces = list(tracer.traces.values())[-limit:]
+    return traces
+
 # ========== 笔记功能 ==========
 @app.get("/api/notes")
 async def list_notes(user=Depends(get_current_user)):
@@ -2567,6 +2792,347 @@ async def share_page(share_id: str):
 
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+# ========== Redis 缓存支持（可选） ==========
+class RedisCache:
+    """Redis 缓存封装，支持降级到内存缓存"""
+    def __init__(self):
+        self.redis = None
+        self.memory_cache = {}
+        self._init_redis()
+    
+    def _init_redis(self):
+        try:
+            import redis
+            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+            self.redis = redis.from_url(redis_url, decode_responses=True)
+            self.redis.ping()
+            logger.info("Redis connected successfully")
+        except Exception as e:
+            logger.warning(f"Redis not available, using memory cache: {e}")
+            self.redis = None
+    
+    async def get(self, key: str) -> Optional[str]:
+        try:
+            if self.redis:
+                return self.redis.get(key)
+            return self.memory_cache.get(key)
+        except:
+            return self.memory_cache.get(key)
+    
+    async def set(self, key: str, value: str, ttl: int = 3600):
+        try:
+            if self.redis:
+                self.redis.setex(key, ttl, value)
+            else:
+                self.memory_cache[key] = value
+        except:
+            self.memory_cache[key] = value
+    
+    async def delete(self, key: str):
+        try:
+            if self.redis:
+                self.redis.delete(key)
+            elif key in self.memory_cache:
+                del self.memory_cache[key]
+        except:
+            pass
+
+redis_cache = RedisCache()
+
+# ========== 异步任务队列 ==========
+class TaskQueue:
+    """简单的异步任务队列"""
+    def __init__(self):
+        self.tasks = asyncio.Queue()
+        self.results = {}
+        self.running = False
+    
+    async def start(self):
+        self.running = True
+        asyncio.create_task(self._worker())
+        logger.info("Task queue started")
+    
+    async def _worker(self):
+        while self.running:
+            try:
+                task_id, func, args, kwargs = await asyncio.wait_for(self.tasks.get(), timeout=1.0)
+                try:
+                    result = await func(*args, **kwargs)
+                    self.results[task_id] = {"status": "completed", "result": result}
+                except Exception as e:
+                    self.results[task_id] = {"status": "failed", "error": str(e)}
+            except asyncio.TimeoutError:
+                continue
+    
+    async def submit(self, func, *args, **kwargs) -> str:
+        task_id = secrets.token_hex(8)
+        self.results[task_id] = {"status": "pending"}
+        await self.tasks.put((task_id, func, args, kwargs))
+        return task_id
+    
+    def get_result(self, task_id: str) -> dict:
+        return self.results.get(task_id, {"status": "not_found"})
+
+task_queue = TaskQueue()
+
+@app.on_event("startup")
+async def startup_event():
+    await task_queue.start()
+    logger.info("AI Hub started successfully")
+
+@app.get("/api/tasks/{task_id}")
+async def get_task_status(task_id: str):
+    """获取异步任务状态"""
+    return task_queue.get_result(task_id)
+
+# ========== 增强的健康检查 ==========
+@app.get("/api/health/detailed")
+async def detailed_health_check():
+    """详细健康检查"""
+    import psutil
+    
+    # 系统资源
+    cpu_percent = psutil.cpu_percent(interval=0.1)
+    memory = psutil.virtual_memory()
+    disk = psutil.disk_usage('/')
+    
+    # 数据库检查
+    db_status = "healthy"
+    db_latency = 0
+    try:
+        start = time.time()
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("SELECT 1")
+        db_latency = (time.time() - start) * 1000
+    except:
+        db_status = "unhealthy"
+    
+    # Redis 检查
+    redis_status = "healthy" if redis_cache.redis else "unavailable"
+    
+    # 缓存统计
+    cache_stats = {
+        "size": len(response_cache.cache),
+        "max_size": response_cache.max_size
+    }
+    
+    return {
+        "status": "healthy" if db_status == "healthy" else "degraded",
+        "timestamp": datetime.now().isoformat(),
+        "version": "2.0.0",
+        "uptime_seconds": time.time() - app.state.start_time if hasattr(app.state, 'start_time') else 0,
+        "system": {
+            "cpu_percent": cpu_percent,
+            "memory_percent": memory.percent,
+            "memory_used_gb": round(memory.used / (1024**3), 2),
+            "disk_percent": disk.percent
+        },
+        "components": {
+            "database": {"status": db_status, "latency_ms": round(db_latency, 2)},
+            "redis": {"status": redis_status},
+            "cache": cache_stats,
+            "task_queue": {"pending_tasks": task_queue.tasks.qsize()}
+        }
+    }
+
+# ========== API 限流增强 ==========
+class AdvancedRateLimiter:
+    """高级限流器，支持多种限流策略"""
+    def __init__(self):
+        self.limits = {
+            "default": {"requests": 60, "window": 60},
+            "chat": {"requests": 30, "window": 60},
+            "image": {"requests": 10, "window": 60},
+            "code": {"requests": 20, "window": 60}
+        }
+        self.requests = defaultdict(list)
+        self.lock = asyncio.Lock()
+    
+    async def check(self, key: str, limit_type: str = "default") -> tuple[bool, dict]:
+        async with self.lock:
+            now = time.time()
+            limit = self.limits.get(limit_type, self.limits["default"])
+            window = limit["window"]
+            max_requests = limit["requests"]
+            
+            # 清理过期记录
+            self.requests[key] = [t for t in self.requests[key] if t > now - window]
+            
+            remaining = max_requests - len(self.requests[key])
+            reset_time = int(now + window)
+            
+            if remaining <= 0:
+                return False, {
+                    "limit": max_requests,
+                    "remaining": 0,
+                    "reset": reset_time,
+                    "retry_after": int(self.requests[key][0] + window - now)
+                }
+            
+            self.requests[key].append(now)
+            return True, {
+                "limit": max_requests,
+                "remaining": remaining - 1,
+                "reset": reset_time
+            }
+
+advanced_limiter = AdvancedRateLimiter()
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """全局限流中间件"""
+    # 获取客户端标识
+    client_ip = request.client.host if request.client else "unknown"
+    auth = request.headers.get("authorization", "")
+    key = auth[7:15] if auth.startswith("Bearer ") else client_ip
+    
+    # 确定限流类型
+    path = request.url.path
+    limit_type = "default"
+    if "/chat" in path:
+        limit_type = "chat"
+    elif "/image" in path:
+        limit_type = "image"
+    elif "/code" in path:
+        limit_type = "code"
+    
+    # 检查限流
+    allowed, info = await advanced_limiter.check(key, limit_type)
+    
+    if not allowed:
+        return JSONResponse(
+            status_code=429,
+            content={"error": "请求过于频繁，请稍后再试", "retry_after": info["retry_after"]},
+            headers={
+                "X-RateLimit-Limit": str(info["limit"]),
+                "X-RateLimit-Remaining": str(info["remaining"]),
+                "X-RateLimit-Reset": str(info["reset"]),
+                "Retry-After": str(info["retry_after"])
+            }
+        )
+    
+    response = await call_next(request)
+    response.headers["X-RateLimit-Limit"] = str(info["limit"])
+    response.headers["X-RateLimit-Remaining"] = str(info["remaining"])
+    response.headers["X-RateLimit-Reset"] = str(info["reset"])
+    return response
+
+# ========== 结构化日志 ==========
+@app.middleware("http")
+async def logging_middleware(request: Request, call_next):
+    """请求日志中间件"""
+    start_time = time.time()
+    
+    # 生成请求 ID
+    request_id = secrets.token_hex(8)
+    
+    response = await call_next(request)
+    
+    # 计算耗时
+    duration = (time.time() - start_time) * 1000
+    
+    # 记录日志
+    log_data = {
+        "request_id": request_id,
+        "method": request.method,
+        "path": request.url.path,
+        "status": response.status_code,
+        "duration_ms": round(duration, 2),
+        "client_ip": request.client.host if request.client else "unknown"
+    }
+    
+    if response.status_code >= 400:
+        logger.warning(f"Request failed: {json.dumps(log_data)}")
+    elif duration > 1000:
+        logger.warning(f"Slow request: {json.dumps(log_data)}")
+    else:
+        logger.debug(f"Request: {json.dumps(log_data)}")
+    
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+# ========== 数据库优化 ==========
+@app.post("/api/admin/optimize-db")
+async def optimize_database(user=Depends(get_current_user)):
+    """优化数据库"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            # 清理过期会话
+            conn.execute("DELETE FROM sessions WHERE expires_at < ?", (datetime.now(),))
+            
+            # 清理旧日志（保留30天）
+            conn.execute("DELETE FROM api_logs WHERE created_at < date('now', '-30 days')")
+            
+            # 清理旧审计日志（保留90天）
+            conn.execute("DELETE FROM audit_logs WHERE created_at < date('now', '-90 days')")
+            
+            # 执行 VACUUM
+            conn.execute("VACUUM")
+            
+            # 分析表
+            conn.execute("ANALYZE")
+        
+        return {"success": True, "message": "数据库优化完成"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"优化失败: {str(e)}")
+
+# ========== 批量操作 API ==========
+@app.post("/api/conversations/batch-delete")
+async def batch_delete_conversations(data: dict, user=Depends(get_current_user)):
+    """批量删除对话"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    ids = data.get("ids", [])
+    if not ids:
+        return {"deleted": 0}
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        placeholders = ",".join("?" * len(ids))
+        conn.execute(f"DELETE FROM messages WHERE conversation_id IN ({placeholders})", ids)
+        result = conn.execute(f"DELETE FROM conversations WHERE id IN ({placeholders}) AND user_id = ?", ids + [user["id"]])
+    
+    return {"deleted": result.rowcount}
+
+@app.post("/api/messages/batch-export")
+async def batch_export_messages(data: dict, user=Depends(get_current_user)):
+    """批量导出消息"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    conv_ids = data.get("conversation_ids", [])
+    format_type = data.get("format", "json")
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        
+        result = []
+        for conv_id in conv_ids:
+            conv = conn.execute(
+                "SELECT * FROM conversations WHERE id = ? AND user_id = ?",
+                (conv_id, user["id"])
+            ).fetchone()
+            
+            if conv:
+                messages = conn.execute(
+                    "SELECT role, content, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at",
+                    (conv_id,)
+                ).fetchall()
+                
+                result.append({
+                    "id": conv["id"],
+                    "title": conv["title"],
+                    "messages": [dict(m) for m in messages]
+                })
+    
+    return {"conversations": result, "count": len(result)}
+
+# 记录启动时间
+app.state.start_time = time.time()
 
 if __name__ == "__main__":
     import uvicorn

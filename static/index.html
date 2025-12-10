@@ -262,6 +262,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="nav-item" data-page="api-server"><span class="nav-item-icon">🖥️</span> API 服务器</div>
 <div class="nav-item" data-page="documents"><span class="nav-item-icon">📄</span> 文档处理</div>
 <div class="nav-item" data-page="workflows"><span class="nav-item-icon">🤖</span> Agent 工作流</div>
+<div class="nav-item" data-page="code-runner"><span class="nav-item-icon">▶️</span> 代码运行</div>
 <div class="nav-item" data-page="prompts"><span class="nav-item-icon">📋</span> Prompt 模板</div>
 <div class="nav-item" data-page="shortcuts"><span class="nav-item-icon">⚡</span> 快捷短语</div>
 <div class="nav-item" data-page="hotkeys"><span class="nav-item-icon">⌨️</span> 快捷键</div>
@@ -273,6 +274,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="nav-item" data-page="selection-assistant"><span class="nav-item-icon">✂️</span> 划词助手</div>
 </div>
 <div class="nav-bottom">
+<div class="nav-item" onclick="showHealthDashboard()"><span class="nav-item-icon">🖥️</span> 系统状态</div>
 <div class="nav-item" data-page="about"><span class="nav-item-icon">ℹ️</span> 关于我们</div>
 <div class="nav-item" id="navUser" onclick="showAuthModal()"><span class="nav-item-icon">👤</span> <span id="navUserName">登录</span></div>
 </div>
@@ -283,7 +285,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="sidebar">
 <div class="sidebar-header">
 <h3>对话列表</h3>
-<div style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm" onclick="searchChats()" title="搜索">🔍</button><button class="btn btn-primary btn-sm" onclick="newChat()">+</button></div>
+<div style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm" onclick="toggleBatchMode()" title="批量操作">☑️</button><button class="btn btn-ghost btn-sm" onclick="searchChats()" title="搜索">🔍</button><button class="btn btn-primary btn-sm" onclick="newChat()">+</button></div>
+</div>
+<div id="batchActions" style="display:none;padding:8px;background:var(--bg3);gap:8px;align-items:center">
+<span style="font-size:12px">已选 <span id="selectedCount">0</span> 个</span>
+<button class="btn btn-danger btn-sm" onclick="batchDeleteChats()">删除</button>
+<button class="btn btn-ghost btn-sm" onclick="batchExportChats()">导出</button>
+<button class="btn btn-ghost btn-sm" onclick="toggleBatchMode()">取消</button>
 </div>
 <div style="padding:8px"><input type="text" id="chatSearchInput" placeholder="搜索对话..." style="width:100%;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;display:none" oninput="filterChats(this.value)"></div>
 <div class="sidebar-list" id="chatList"></div>
@@ -312,6 +320,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div style="flex:1"></div>
 <button class="btn btn-ghost btn-sm" onclick="clearChat()">🗑️ 清空</button>
 <button class="btn btn-ghost btn-sm" onclick="shareChat()" title="分享对话">🔗 分享</button>
+<button class="btn btn-ghost btn-sm" onclick="generateMindmap()" title="生成思维导图">🧠</button>
+<button class="btn btn-ghost btn-sm" onclick="saveAsTemplate()" title="保存为模板">💾</button>
 <div style="position:relative;display:inline-block"><button class="btn btn-ghost btn-sm" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block'">📥 导出</button><div style="display:none;position:absolute;bottom:100%;left:0;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:4px;min-width:100px;z-index:100"><div style="padding:8px 12px;cursor:pointer;border-radius:4px;font-size:12px" onclick="exportChat('txt');this.parentElement.style.display='none'" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">📄 TXT</div><div style="padding:8px 12px;cursor:pointer;border-radius:4px;font-size:12px" onclick="exportChat('md');this.parentElement.style.display='none'" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">📝 Markdown</div><div style="padding:8px 12px;cursor:pointer;border-radius:4px;font-size:12px" onclick="exportChat('json');this.parentElement.style.display='none'" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">📋 JSON</div></div></div>
 </div>
 <div class="chat-input-box">
@@ -861,6 +871,33 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div id="workflowResultsContent"></div>
 </div>
 </div></div></div></div>
+<!-- 代码运行器页 -->
+<div id="page-code-runner" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
+<div class="settings-section">
+<h4><span>▶️</span> 代码运行器</h4>
+<p style="color:var(--text2);margin-bottom:16px">在线运行 Python / JavaScript 代码</p>
+<div class="form-group">
+<label>语言</label>
+<select id="codeLanguage" style="width:150px">
+<option value="python">Python</option>
+<option value="javascript">JavaScript</option>
+</select>
+</div>
+<div class="form-group">
+<label>代码</label>
+<textarea id="codeInput" rows="12" style="font-family:monospace;font-size:13px" placeholder="# 输入代码...
+print('Hello, World!')"></textarea>
+</div>
+<div style="display:flex;gap:12px">
+<button class="btn btn-primary" onclick="runCode()">▶️ 运行</button>
+<button class="btn btn-ghost" onclick="$('codeInput').value=''">清空</button>
+</div>
+</div>
+<div class="settings-section">
+<h4><span>📋</span> 输出结果</h4>
+<pre id="codeOutput" style="background:var(--bg);padding:16px;border-radius:8px;min-height:100px;font-family:monospace;font-size:13px;white-space:pre-wrap">等待运行...</pre>
+</div>
+</div></div></div></div>
 <!-- Prompt 模板页 -->
 <div id="page-prompts" class="page"><div class="content"><div class="content-body"><div class="settings-panel">
 <div class="settings-section">
@@ -1404,6 +1441,15 @@ function searchKB(kbId){var q=prompt('输入搜索关键词:');if(!q)return;api(
 function toggleMobileNav(){document.querySelector('.nav').classList.toggle('show');document.querySelector('.mobile-overlay').classList.toggle('show')}
 function toggleMobileSidebar(){document.querySelector('.sidebar').classList.toggle('show');document.querySelector('.mobile-overlay').classList.toggle('show')}
 function closeMobileMenus(){document.querySelector('.nav').classList.remove('show');document.querySelector('.sidebar').classList.remove('show');document.querySelector('.mobile-overlay').classList.remove('show')}
+// 代码运行器
+function runCode(){var code=$('codeInput').value;var lang=$('codeLanguage').value;if(!code.trim()){alert('请输入代码');return}$('codeOutput').textContent='运行中...';$('codeOutput').style.color='var(--text2)';api('/api/code/run',{method:'POST',body:JSON.stringify({code:code,language:lang,timeout:5})}).then(function(data){if(data.success){$('codeOutput').textContent=data.output||'(无输出)';$('codeOutput').style.color='var(--success)'}else{$('codeOutput').textContent='错误: '+(data.error||'未知错误')+'\n'+data.output;$('codeOutput').style.color='var(--error)'}}).catch(function(e){$('codeOutput').textContent='请求失败: '+e.message;$('codeOutput').style.color='var(--error)'})}
+// 思维导图
+function generateMindmap(){var chat=chats.find(function(c){return c.id===currentChatId});if(!chat||!chat.messages.length){alert('当前对话为空');return}showToast('正在生成思维导图...');api('/api/mindmap/generate',{method:'POST',body:JSON.stringify({messages:chat.messages,title:chat.title})}).then(function(data){renderMindmap(data.nodes)}).catch(function(e){alert('生成失败: '+e.message)})}
+function renderMindmap(nodes){var html='<div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:2000;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)this.remove()"><div style="background:var(--bg2);border-radius:16px;padding:24px;max-width:800px;max-height:80vh;overflow:auto"><h3 style="margin-bottom:16px">🧠 思维导图</h3><div id="mindmapContent" style="padding:20px"></div><button class="btn btn-ghost" onclick="this.parentElement.parentElement.remove()">关闭</button></div></div>';document.body.insertAdjacentHTML('beforeend',html);var content='';function renderNode(node,level){var indent=level*24;content+='<div style="margin-left:'+indent+'px;padding:8px 12px;margin-bottom:4px;background:var(--bg'+(level>0?'3':'')+');border-radius:6px;border-left:3px solid var(--accent)">'+(level>0?'├─ ':'')+node.label+'</div>';if(node.children){node.children.forEach(function(c){renderNode(c,level+1)})}}if(nodes&&nodes.length)renderNode(nodes[0],0);$('mindmapContent').innerHTML=content||'<p style="color:var(--text2)">无法生成思维导图</p>'}
+// 保存对话为模板
+function saveAsTemplate(){var chat=chats.find(function(c){return c.id===currentChatId});if(!chat||!chat.messages.length){alert('当前对话为空');return}var name=prompt('模板名称:',chat.title);if(!name)return;api('/api/chat-templates',{method:'POST',body:JSON.stringify({name:name,messages:chat.messages})}).then(function(){showToast('已保存为模板')}).catch(function(e){alert('保存失败: '+e.message)})}
+// 用量配额
+function loadQuota(){api('/api/quota').then(function(data){var html='<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Token 使用量</span><span>'+formatNumber(data.tokens_used)+' / '+formatNumber(data.tokens_limit)+'</span></div><div style="background:var(--bg3);border-radius:4px;height:8px;overflow:hidden"><div style="background:var(--accent);height:100%;width:'+data.usage_percent+'%"></div></div></div><p style="font-size:12px;color:var(--text2)">当前套餐: '+data.plan+'</p>';if($('quotaInfo'))$('quotaInfo').innerHTML=html}).catch(function(e){console.error(e)})}
 // PWA 注册
 if('serviceWorker' in navigator){navigator.serviceWorker.register('/static/sw.js').then(function(reg){console.log('SW registered');if('Notification' in window&&Notification.permission==='default'){Notification.requestPermission()}}).catch(function(e){console.error('SW failed:',e)})}
 // 图片生成
@@ -1419,7 +1465,98 @@ function createBackup(){api('/api/backup',{method:'POST'}).then(function(data){s
 // 离线检测
 window.addEventListener('online',function(){showToast('网络已恢复')});
 window.addEventListener('offline',function(){showToast('网络已断开，部分功能不可用')});
-console.log('🤖 AI Hub v2.0.0');
+
+// ========== 性能监控面板 ==========
+function showHealthDashboard(){
+api('/api/health/detailed').then(function(data){
+var html='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px">';
+html+='<div style="background:var(--bg);padding:16px;border-radius:10px"><div style="font-size:12px;color:var(--text2)">CPU 使用率</div><div style="font-size:24px;font-weight:600;color:'+(data.system.cpu_percent>80?'var(--error)':'var(--success)')+'">'+data.system.cpu_percent+'%</div></div>';
+html+='<div style="background:var(--bg);padding:16px;border-radius:10px"><div style="font-size:12px;color:var(--text2)">内存使用率</div><div style="font-size:24px;font-weight:600;color:'+(data.system.memory_percent>80?'var(--error)':'var(--success)')+'">'+data.system.memory_percent+'%</div></div>';
+html+='<div style="background:var(--bg);padding:16px;border-radius:10px"><div style="font-size:12px;color:var(--text2)">磁盘使用率</div><div style="font-size:24px;font-weight:600;color:'+(data.system.disk_percent>90?'var(--error)':'var(--success)')+'">'+data.system.disk_percent+'%</div></div>';
+html+='<div style="background:var(--bg);padding:16px;border-radius:10px"><div style="font-size:12px;color:var(--text2)">数据库延迟</div><div style="font-size:24px;font-weight:600;color:'+(data.components.database.latency_ms>100?'var(--warning)':'var(--success)')+'">'+data.components.database.latency_ms+'ms</div></div>';
+html+='</div>';
+html+='<div style="margin-top:16px;padding:16px;background:var(--bg);border-radius:10px">';
+html+='<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>缓存</span><span>'+data.components.cache.size+'/'+data.components.cache.max_size+'</span></div>';
+html+='<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Redis</span><span style="color:'+(data.components.redis.status==='healthy'?'var(--success)':'var(--warning)')+'">'+data.components.redis.status+'</span></div>';
+html+='<div style="display:flex;justify-content:space-between"><span>待处理任务</span><span>'+data.components.task_queue.pending_tasks+'</span></div>';
+html+='</div>';
+html+='<div style="margin-top:16px;text-align:center;font-size:12px;color:var(--text2)">版本 '+data.version+' · 运行时间 '+formatUptime(data.uptime_seconds)+'</div>';
+showCustomModal('🖥️ 系统状态',html,'healthModal')
+}).catch(function(e){alert('获取状态失败: '+e.message)})}
+function formatUptime(seconds){var h=Math.floor(seconds/3600);var m=Math.floor((seconds%3600)/60);return h+'小时'+m+'分钟'}
+
+// ========== 批量操作 ==========
+var batchMode=false;
+var selectedChats=[];
+function toggleBatchMode(){batchMode=!batchMode;selectedChats=[];if(batchMode){$('batchActions').style.display='flex';showToast('已进入批量选择模式')}else{$('batchActions').style.display='none'}renderChatList()}
+function toggleChatSelection(id,e){if(!batchMode)return;e.stopPropagation();var idx=selectedChats.indexOf(id);if(idx>=0){selectedChats.splice(idx,1)}else{selectedChats.push(id)}renderChatList();$('selectedCount').textContent=selectedChats.length}
+function batchDeleteChats(){if(selectedChats.length===0){alert('请先选择对话');return}if(!confirm('确定删除 '+selectedChats.length+' 个对话？'))return;api('/api/conversations/batch-delete',{method:'POST',body:JSON.stringify({ids:selectedChats})}).then(function(data){showToast('已删除 '+data.deleted+' 个对话');selectedChats=[];batchMode=false;$('batchActions').style.display='none';loadChats()}).catch(function(e){alert('删除失败: '+e.message)})}
+function batchExportChats(){if(selectedChats.length===0){alert('请先选择对话');return}api('/api/messages/batch-export',{method:'POST',body:JSON.stringify({conversation_ids:selectedChats,format:'json'})}).then(function(data){var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='conversations_export.json';a.click();showToast('已导出 '+data.count+' 个对话')}).catch(function(e){alert('导出失败: '+e.message)})}
+
+// ========== 数据库优化 ==========
+function optimizeDatabase(){if(!confirm('确定要优化数据库？这将清理过期数据。'))return;showToast('正在优化...');api('/api/admin/optimize-db',{method:'POST'}).then(function(data){showToast(data.message)}).catch(function(e){alert('优化失败: '+e.message)})}
+
+// ========== 快捷键增强 ==========
+document.addEventListener('keydown',function(e){
+if(e.ctrlKey&&e.key==='h'){e.preventDefault();showHealthDashboard()}
+if(e.ctrlKey&&e.key==='b'){e.preventDefault();toggleBatchMode()}
+if(e.ctrlKey&&e.shiftKey&&e.key==='E'){e.preventDefault();batchExportChats()}
+});
+
+// ========== 性能优化：虚拟滚动 ==========
+function renderChatListVirtual(){
+var container=$('chatList');
+var itemHeight=60;
+var visibleCount=Math.ceil(container.clientHeight/itemHeight)+2;
+var scrollTop=container.scrollTop;
+var startIndex=Math.floor(scrollTop/itemHeight);
+var endIndex=Math.min(startIndex+visibleCount,chats.length);
+var html='<div style="height:'+(startIndex*itemHeight)+'px"></div>';
+for(var i=startIndex;i<endIndex;i++){
+var c=chats[i];
+var active=c.id===currentChatId?'active':'';
+var selected=selectedChats.includes(c.id)?'border:2px solid var(--accent);':'';
+var checkbox=batchMode?'<input type="checkbox" '+(selectedChats.includes(c.id)?'checked':'')+' onclick="toggleChatSelection(\''+c.id+'\',event)" style="margin-right:8px">':'';
+html+='<div class="sidebar-item '+active+'" style="'+selected+'" onclick="loadChat(\''+c.id+'\')">'+checkbox+'<div class="sidebar-item-icon">💬</div><div class="sidebar-item-info"><div class="sidebar-item-title">'+c.title+'</div><div class="sidebar-item-desc">'+(c.messages.length||0)+' 条消息</div></div><button class="btn btn-ghost btn-sm chat-delete-btn" style="opacity:0" onclick="deleteChat(\''+c.id+'\',event)">🗑️</button></div>'
+}
+html+='<div style="height:'+((chats.length-endIndex)*itemHeight)+'px"></div>';
+container.innerHTML=html}
+
+// ========== 请求重试机制 ==========
+async function apiWithRetry(url,options,maxRetries=3){
+for(var i=0;i<maxRetries;i++){
+try{return await api(url,options)}
+catch(e){
+if(i===maxRetries-1)throw e;
+await new Promise(function(r){setTimeout(r,1000*(i+1))});
+console.log('Retrying request...',i+1)
+}}}
+
+// ========== 消息队列（离线支持） ==========
+var offlineQueue=JSON.parse(localStorage.getItem('offlineQueue')||'[]');
+function queueOfflineMessage(msg){offlineQueue.push({msg:msg,time:Date.now()});localStorage.setItem('offlineQueue',JSON.stringify(offlineQueue))}
+function processOfflineQueue(){if(offlineQueue.length===0)return;showToast('正在发送离线消息...');var msg=offlineQueue.shift();localStorage.setItem('offlineQueue',JSON.stringify(offlineQueue));sendMessageInternal(msg.msg).then(function(){processOfflineQueue()}).catch(function(){offlineQueue.unshift(msg);localStorage.setItem('offlineQueue',JSON.stringify(offlineQueue))})}
+window.addEventListener('online',processOfflineQueue);
+
+// ========== 智能预加载 ==========
+function preloadNextChat(){
+var currentIdx=chats.findIndex(function(c){return c.id===currentChatId});
+if(currentIdx>=0&&currentIdx<chats.length-1){
+var nextChat=chats[currentIdx+1];
+if(!nextChat.messages||nextChat.messages.length===0){
+api('/api/conversations/'+nextChat.id+'/messages').then(function(msgs){nextChat.messages=msgs})}}}
+
+// ========== 自动保存草稿 ==========
+var draftTimer=null;
+function saveDraft(){var input=$('chatInput').value;if(input&&currentChatId){localStorage.setItem('draft_'+currentChatId,input)}}
+function loadDraft(){if(currentChatId){var draft=localStorage.getItem('draft_'+currentChatId);if(draft)$('chatInput').value=draft}}
+function clearDraft(){if(currentChatId)localStorage.removeItem('draft_'+currentChatId)}
+$('chatInput').addEventListener('input',function(){clearTimeout(draftTimer);draftTimer=setTimeout(saveDraft,1000)});
+
+// ========== 消息搜索增强 ==========
+function searchInCurrentChat(){var q=prompt('在当前对话中搜索:');if(!q)return;var chat=chats.find(function(c){return c.id===currentChatId});if(!chat||!chat.messages)return;var results=chat.messages.filter(function(m){return m.content&&m.content.toLowerCase().includes(q.toLowerCase())});if(results.length===0){alert('未找到匹配消息');return}var html='<div style="max-height:400px;overflow-y:auto">';results.forEach(function(m,i){html+='<div style="padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px"><div style="font-size:12px;color:var(--text2);margin-bottom:4px">'+(m.role==='user'?'👤 用户':'🤖 助手')+'</div><div style="font-size:14px">'+m.content.slice(0,200)+(m.content.length>200?'...':'')+'</div></div>'});html+='</div>';showCustomModal('搜索结果 ('+results.length+')',html,'searchResultModal')}
+
+console.log('🤖 AI Hub v2.0.0 - Enhanced');
 </script>
 </body>
 </html>
