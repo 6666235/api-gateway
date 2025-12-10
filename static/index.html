@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0f0f1a">
+<meta name="description" content="AI Hub - 统一 AI 平台">
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
 <title>AI Hub</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -302,6 +306,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <button class="btn btn-ghost btn-sm" onclick="uploadFile()" title="上传文件">📎</button>
 <button class="btn btn-ghost btn-sm" onclick="voiceInput()" title="语音输入">🎤</button>
 <button class="btn btn-ghost btn-sm" onclick="estimateTokens()" title="估算 Token">🔢</button>
+<button class="btn btn-ghost btn-sm" onclick="generateImage()" title="生成图片">🎨</button>
 <button class="btn btn-ghost btn-sm" onclick="showSearchModal()" title="搜索 Ctrl+K">🔍</button>
 <button class="btn btn-ghost btn-sm" onclick="toggleTheme()" title="切换主题 Ctrl+D">🌓</button>
 <div style="flex:1"></div>
@@ -1399,7 +1404,22 @@ function searchKB(kbId){var q=prompt('输入搜索关键词:');if(!q)return;api(
 function toggleMobileNav(){document.querySelector('.nav').classList.toggle('show');document.querySelector('.mobile-overlay').classList.toggle('show')}
 function toggleMobileSidebar(){document.querySelector('.sidebar').classList.toggle('show');document.querySelector('.mobile-overlay').classList.toggle('show')}
 function closeMobileMenus(){document.querySelector('.nav').classList.remove('show');document.querySelector('.sidebar').classList.remove('show');document.querySelector('.mobile-overlay').classList.remove('show')}
-console.log('🤖 AI Hub v1.8.0');
+// PWA 注册
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/static/sw.js').then(function(reg){console.log('SW registered');if('Notification' in window&&Notification.permission==='default'){Notification.requestPermission()}}).catch(function(e){console.error('SW failed:',e)})}
+// 图片生成
+function generateImage(){var prompt=prompt('输入图片描述:');if(!prompt)return;showToast('正在生成图片...');api('/api/images/generate',{method:'POST',body:JSON.stringify({prompt:prompt})}).then(function(data){var img='<img src="'+data.url+'" style="max-width:100%;border-radius:8px">';var chat=chats.find(function(c){return c.id===currentChatId});if(chat){chat.messages.push({role:'assistant',content:'![生成的图片]('+data.url+')\n\n'+data.revised_prompt});saveChats();renderMessages()}showToast('图片已生成')}).catch(function(e){alert('生成失败: '+e.message)})}
+// TTS 语音合成
+function speakText(text){api('/api/audio/tts',{method:'POST',body:JSON.stringify({text:text,voice:'alloy'})}).then(function(data){var audio=new Audio(data.audio);audio.play();showToast('正在播放')}).catch(function(e){if('speechSynthesis' in window){var utterance=new SpeechSynthesisUtterance(text);utterance.lang='zh-CN';speechSynthesis.speak(utterance)}else{alert('TTS 失败: '+e.message)}})}
+// 内容过滤
+function filterContent(text){return api('/api/content/filter',{method:'POST',body:JSON.stringify({text:text})}).then(function(data){return data})}
+// 数据脱敏
+function maskData(text){return api('/api/data/mask',{method:'POST',body:JSON.stringify({text:text})}).then(function(data){return data.masked})}
+// 备份
+function createBackup(){api('/api/backup',{method:'POST'}).then(function(data){showToast('备份已创建: '+data.path)}).catch(function(e){alert('备份失败: '+e.message)})}
+// 离线检测
+window.addEventListener('online',function(){showToast('网络已恢复')});
+window.addEventListener('offline',function(){showToast('网络已断开，部分功能不可用')});
+console.log('🤖 AI Hub v2.0.0');
 </script>
 </body>
 </html>

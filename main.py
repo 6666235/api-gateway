@@ -1123,6 +1123,394 @@ async def get_workflow_templates():
     """获取预设工作流模板"""
     return WORKFLOW_TEMPLATES
 
+# ========== Function Calling ==========
+import re
+import math
+
+# 内置函数定义
+BUILTIN_FUNCTIONS = {
+    "get_weather": {
+        "name": "get_weather",
+        "description": "获取指定城市的天气信息",
+        "parameters": {"type": "object", "properties": {"city": {"type": "string", "description": "城市名称"}}, "required": ["city"]}
+    },
+    "calculate": {
+        "name": "calculate",
+        "description": "计算数学表达式",
+        "parameters": {"type": "object", "properties": {"expression": {"type": "string", "description": "数学表达式"}}, "required": ["expression"]}
+    },
+    "search_web": {
+        "name": "search_web",
+        "description": "搜索网络获取信息",
+        "parameters": {"type": "object", "properties": {"query": {"type": "string", "description": "搜索关键词"}}, "required": ["query"]}
+    },
+    "get_time": {
+        "name": "get_time",
+        "description": "获取当前时间",
+        "parameters": {"type": "object", "properties": {"timezone": {"type": "string", "description": "时区，如 Asia/Shanghai"}}}
+    },
+    "translate": {
+        "name": "translate",
+        "description": "翻译文本",
+        "parameters": {"type": "object", "properties": {"text": {"type": "string"}, "target_lang": {"type": "string"}}, "required": ["text", "target_lang"]}
+    }
+}
+
+async def execute_function(name: str, args: dict) -> str:
+    """执行内置函数"""
+    if name == "get_weather":
+        city = args.get("city", "北京")
+        # 模拟天气数据
+        import random
+        temp = random.randint(15, 30)
+        conditions = ["晴", "多云", "阴", "小雨"]
+        return f"{city}天气：{random.choice(conditions)}，温度 {temp}°C，湿度 {random.randint(40, 80)}%"
+    
+    elif name == "calculate":
+        expr = args.get("expression", "0")
+        try:
+            # 安全计算
+            allowed = set("0123456789+-*/().^ ")
+            if all(c in allowed for c in expr):
+                expr = expr.replace("^", "**")
+                result = eval(expr)
+                return f"计算结果：{expr} = {result}"
+            return "表达式包含不允许的字符"
+        except Exception as e:
+            return f"计算错误：{str(e)}"
+    
+    elif name == "search_web":
+        query = args.get("query", "")
+        # 模拟搜索结果
+        return f"搜索「{query}」的结果：\n1. {query}相关信息...\n2. {query}详细介绍...\n3. {query}最新动态..."
+    
+    elif name == "get_time":
+        from datetime import datetime
+        tz = args.get("timezone", "Asia/Shanghai")
+        now = datetime.now()
+        return f"当前时间：{now.strftime('%Y-%m-%d %H:%M:%S')} ({tz})"
+    
+    elif name == "translate":
+        text = args.get("text", "")
+        target = args.get("target_lang", "en")
+        return f"[翻译结果] {text} -> ({target}) ..."
+    
+    return f"未知函数：{name}"
+
+@app.post("/api/functions/call")
+async def call_function(data: dict, user=Depends(get_current_user)):
+    """调用内置函数"""
+    name = data.get("name")
+    args = data.get("arguments", {})
+    if name not in BUILTIN_FUNCTIONS:
+        raise HTTPException(status_code=400, detail=f"未知函数：{name}")
+    result = await execute_function(name, args)
+    return {"result": result}
+
+@app.get("/api/functions")
+async def list_functions():
+    """获取可用函数列表"""
+    return list(BUILTIN_FUNCTIONS.values())
+
+# ========== 多模态支持 ==========
+@app.post("/api/images/generate")
+async def generate_image(data: dict, user=Depends(get_current_user)):
+    """生成图片（DALL-E）"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    prompt = data.get("prompt", "")
+    size = data.get("size", "1024x1024")
+    
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="未配置 OpenAI API Key")
+    
+    async with httpx.AsyncClient(timeout=120) as client:
+        response = await client.post(
+            "https://api.openai.com/v1/images/generations",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"model": "dall-e-3", "prompt": prompt, "n": 1, "size": size}
+        )
+        if response.status_code == 200:
+            data = response.json()
+            return {"url": data["data"][0]["url"], "revised_prompt": data["data"][0].get("revised_prompt")}
+        else:
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+
+@app.post("/api/audio/tts")
+async def text_to_speech(data: dict, user=Depends(get_current_user)):
+    """文字转语音（TTS）"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    text = data.get("text", "")
+    voice = data.get("voice", "alloy")  # alloy, echo, fable, onyx, nova, shimmer
+    
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="未配置 OpenAI API Key")
+    
+    async with httpx.AsyncClient(timeout=60) as client:
+        response = await client.post(
+            "https://api.openai.com/v1/audio/speech",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"model": "tts-1", "input": text, "voice": voice}
+        )
+        if response.status_code == 200:
+            audio_base64 = base64.b64encode(response.content).decode()
+            return {"audio": f"data:audio/mp3;base64,{audio_base64}"}
+        else:
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+
+# ========== 长文本处理 ==========
+def chunk_text(text: str, max_tokens: int = 4000) -> List[str]:
+    """将长文本分块"""
+    # 简单按字符数分块（约4字符=1token）
+    chunk_size = max_tokens * 4
+    chunks = []
+    for i in range(0, len(text), chunk_size):
+        chunks.append(text[i:i + chunk_size])
+    return chunks
+
+@app.post("/api/text/chunk")
+async def chunk_long_text(data: dict):
+    """分块处理长文本"""
+    text = data.get("text", "")
+    max_tokens = data.get("max_tokens", 4000)
+    chunks = chunk_text(text, max_tokens)
+    return {"chunks": chunks, "count": len(chunks)}
+
+@app.post("/api/text/summarize-long")
+async def summarize_long_text(data: dict, user=Depends(get_current_user)):
+    """摘要长文本（分块处理）"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    text = data.get("text", "")
+    chunks = chunk_text(text, 3000)
+    
+    summaries = []
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    
+    async with httpx.AsyncClient(timeout=120) as client:
+        for i, chunk in enumerate(chunks):
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={
+                    "model": "gpt-4o-mini",
+                    "messages": [{"role": "user", "content": f"请用3-5句话总结以下内容：\n\n{chunk}"}],
+                    "max_tokens": 500
+                }
+            )
+            if response.status_code == 200:
+                result = response.json()
+                summaries.append(result["choices"][0]["message"]["content"])
+    
+    # 合并摘要
+    if len(summaries) > 1:
+        combined = "\n\n".join(summaries)
+        response = await client.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": "gpt-4o-mini",
+                "messages": [{"role": "user", "content": f"请将以下多段摘要合并为一个完整的摘要：\n\n{combined}"}],
+                "max_tokens": 1000
+            }
+        )
+        if response.status_code == 200:
+            result = response.json()
+            return {"summary": result["choices"][0]["message"]["content"], "chunks_processed": len(chunks)}
+    
+    return {"summary": summaries[0] if summaries else "", "chunks_processed": len(chunks)}
+
+# ========== 上下文压缩 ==========
+@app.post("/api/context/compress")
+async def compress_context(data: dict, user=Depends(get_current_user)):
+    """压缩对话上下文"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    messages = data.get("messages", [])
+    max_tokens = data.get("max_tokens", 2000)
+    
+    if len(messages) <= 4:
+        return {"messages": messages, "compressed": False}
+    
+    # 保留最近的消息，压缩较早的消息
+    recent = messages[-4:]
+    older = messages[:-4]
+    
+    # 将较早的消息压缩为摘要
+    older_text = "\n".join([f"{m['role']}: {m['content']}" for m in older])
+    
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    async with httpx.AsyncClient(timeout=60) as client:
+        response = await client.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": "gpt-4o-mini",
+                "messages": [{"role": "user", "content": f"请用2-3句话总结以下对话的要点：\n\n{older_text}"}],
+                "max_tokens": 200
+            }
+        )
+        if response.status_code == 200:
+            result = response.json()
+            summary = result["choices"][0]["message"]["content"]
+            compressed = [{"role": "system", "content": f"之前的对话摘要：{summary}"}] + recent
+            return {"messages": compressed, "compressed": True, "original_count": len(messages), "new_count": len(compressed)}
+    
+    return {"messages": messages, "compressed": False}
+
+# ========== 敏感词过滤 ==========
+SENSITIVE_WORDS = ["暴力", "色情", "赌博", "毒品"]  # 示例敏感词
+
+def filter_sensitive(text: str) -> tuple:
+    """过滤敏感词"""
+    found = []
+    filtered = text
+    for word in SENSITIVE_WORDS:
+        if word in text:
+            found.append(word)
+            filtered = filtered.replace(word, "*" * len(word))
+    return filtered, found
+
+@app.post("/api/content/filter")
+async def filter_content(data: dict):
+    """内容安全过滤"""
+    text = data.get("text", "")
+    filtered, found = filter_sensitive(text)
+    return {"filtered": filtered, "sensitive_words": found, "is_safe": len(found) == 0}
+
+# ========== 数据脱敏 ==========
+def mask_sensitive_data(text: str) -> str:
+    """自动脱敏敏感信息"""
+    # 手机号
+    text = re.sub(r'1[3-9]\d{9}', lambda m: m.group()[:3] + '****' + m.group()[-4:], text)
+    # 邮箱
+    text = re.sub(r'[\w.-]+@[\w.-]+\.\w+', lambda m: m.group()[:3] + '***@***', text)
+    # 身份证
+    text = re.sub(r'\d{17}[\dXx]', lambda m: m.group()[:6] + '********' + m.group()[-4:], text)
+    # 银行卡
+    text = re.sub(r'\d{16,19}', lambda m: m.group()[:4] + ' **** **** ' + m.group()[-4:], text)
+    return text
+
+@app.post("/api/data/mask")
+async def mask_data(data: dict):
+    """数据脱敏"""
+    text = data.get("text", "")
+    masked = mask_sensitive_data(text)
+    return {"masked": masked}
+
+# ========== Prometheus 指标 ==========
+METRICS = {
+    "requests_total": 0,
+    "requests_success": 0,
+    "requests_error": 0,
+    "tokens_used": 0,
+    "active_users": 0,
+    "response_time_sum": 0,
+    "response_time_count": 0
+}
+
+@app.get("/metrics")
+async def prometheus_metrics():
+    """Prometheus 指标端点"""
+    lines = [
+        f"# HELP ai_hub_requests_total Total requests",
+        f"# TYPE ai_hub_requests_total counter",
+        f"ai_hub_requests_total {METRICS['requests_total']}",
+        f"# HELP ai_hub_requests_success Successful requests",
+        f"ai_hub_requests_success {METRICS['requests_success']}",
+        f"# HELP ai_hub_requests_error Error requests",
+        f"ai_hub_requests_error {METRICS['requests_error']}",
+        f"# HELP ai_hub_tokens_used Total tokens used",
+        f"ai_hub_tokens_used {METRICS['tokens_used']}",
+        f"# HELP ai_hub_active_users Active users",
+        f"ai_hub_active_users {METRICS['active_users']}",
+    ]
+    if METRICS['response_time_count'] > 0:
+        avg_time = METRICS['response_time_sum'] / METRICS['response_time_count']
+        lines.append(f"# HELP ai_hub_response_time_avg Average response time")
+        lines.append(f"ai_hub_response_time_avg {avg_time:.3f}")
+    return "\n".join(lines)
+
+# ========== 自动备份 ==========
+import shutil
+
+@app.post("/api/backup")
+async def create_backup(user=Depends(get_current_user)):
+    """创建数据库备份"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = f"backups/data_{timestamp}.db"
+    os.makedirs("backups", exist_ok=True)
+    shutil.copy(DB_PATH, backup_path)
+    logger.info(f"Backup created: {backup_path}")
+    return {"success": True, "path": backup_path, "timestamp": timestamp}
+
+@app.get("/api/backups")
+async def list_backups(user=Depends(get_current_user)):
+    """列出备份"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    if not os.path.exists("backups"):
+        return []
+    
+    backups = []
+    for f in os.listdir("backups"):
+        if f.endswith(".db"):
+            path = os.path.join("backups", f)
+            backups.append({
+                "filename": f,
+                "size": os.path.getsize(path),
+                "created": datetime.fromtimestamp(os.path.getctime(path)).isoformat()
+            })
+    return sorted(backups, key=lambda x: x["created"], reverse=True)
+
+# ========== Webhook ==========
+WEBHOOKS = []
+
+@app.post("/api/webhooks")
+async def create_webhook(data: dict, user=Depends(get_current_user)):
+    """创建 Webhook"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    
+    webhook = {
+        "id": secrets.token_hex(8),
+        "user_id": user["id"],
+        "url": data.get("url"),
+        "events": data.get("events", ["message.created"]),
+        "secret": secrets.token_hex(16),
+        "created_at": datetime.now().isoformat()
+    }
+    WEBHOOKS.append(webhook)
+    return webhook
+
+@app.get("/api/webhooks")
+async def list_webhooks(user=Depends(get_current_user)):
+    """列出 Webhook"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    return [w for w in WEBHOOKS if w["user_id"] == user["id"]]
+
+async def trigger_webhook(event: str, data: dict, user_id: int):
+    """触发 Webhook"""
+    for webhook in WEBHOOKS:
+        if webhook["user_id"] == user_id and event in webhook["events"]:
+            try:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    await client.post(webhook["url"], json={"event": event, "data": data})
+            except:
+                pass
+
 # ========== 笔记功能 ==========
 @app.get("/api/notes")
 async def list_notes(user=Depends(get_current_user)):
