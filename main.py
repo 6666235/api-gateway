@@ -5475,19 +5475,6 @@ async def get_scheduled_jobs():
         return []
 
 # 挂载静态文件
-from fastapi.staticfiles import StaticFiles
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# 根路径重定向到主页
-@app.get("/")
-async def root():
-    return FileResponse("static/index.html")
-
-# 分享页面
-@app.get("/share/{share_id}")
-async def share_page(share_id: str):
-    return FileResponse("static/share.html")
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
