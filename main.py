@@ -562,18 +562,33 @@ init_extended_db()
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
-# 获取当前用户
+# 获取当前用户（已禁用登录验证，返回默认用户）
 async def get_current_user(authorization: Optional[str] = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        return None
-    token = authorization[7:]
+    # 返回默认用户，无需登录
+    default_user = {
+        "id": 1,
+        "username": "default",
+        "email": None,
+        "plan": "unlimited",
+        "tokens_used": 0,
+        "tokens_limit": -1,  # 无限制
+        "totp_enabled": 0,
+        "locale": "zh-CN"
+    }
+    
+    # 确保默认用户存在于数据库中
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT u.* FROM users u JOIN sessions s ON u.id = s.user_id WHERE s.token = ? AND s.expires_at > ?",
-            (token, datetime.now())
-        ).fetchone()
-        return dict(row) if row else None
+        row = conn.execute("SELECT * FROM users WHERE id = 1").fetchone()
+        if row:
+            return dict(row)
+        else:
+            # 创建默认用户
+            conn.execute("""
+                INSERT OR IGNORE INTO users (id, username, password_hash, plan, tokens_limit)
+                VALUES (1, 'default', '', 'unlimited', -1)
+            """)
+            return default_user
 
 # 平台配置
 PROVIDERS = {

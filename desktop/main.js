@@ -186,7 +186,7 @@ function createMenu() {
 
 // IPC 通信
 ipcMain.handle('get-config', () => store.get('config', defaultConfig));
-ipcMain.handle('set-config', (event, config) => store.set('config', config));
+ipcMain.handle('set-config', (_event, config) => store.set('config', config));
 ipcMain.handle('get-theme', () => nativeTheme.shouldUseDarkColors ? 'dark' : 'light');
 
 // 应用启动

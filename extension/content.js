@@ -257,7 +257,7 @@ function hideResultPanel() {
 }
 
 // 监听来自 background 的消息
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.action === 'showResult') {
     if (request.loading) {
       showResultPanel('处理中...', true);

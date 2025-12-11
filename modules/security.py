@@ -53,10 +53,11 @@ class WebApplicationFirewall:
     
     def __init__(self):
         self.rules = self.DEFAULT_RULES.copy()
-        self.blocked_ips: Set[str] = set()
+        self.blocked_ips: Dict[str, float] = {}  # ip -> block_time
         self.ip_violations: Dict[str, List[float]] = defaultdict(list)
         self.violation_threshold = 10  # 10次违规后封禁
         self.violation_window = 300  # 5分钟窗口
+        self.block_duration = 3600  # 封禁1小时后自动解封
     
     def check(self, content: str, ip: str = None) -> Dict:
         """检查内容是否违规"""
@@ -77,7 +78,7 @@ class WebApplicationFirewall:
         if ip and violations:
             self._record_violation(ip)
             if self._should_block_ip(ip):
-                self.blocked_ips.add(ip)
+                self.blocked_ips[ip] = time.time()
         
         should_block = any(v["action"] == "block" for v in violations)
         
@@ -104,16 +105,86 @@ class WebApplicationFirewall:
     
     def is_ip_blocked(self, ip: str) -> bool:
         """检查 IP 是否被封禁"""
-        return ip in self.blocked_ips
+        if ip not in self.blocked_ips:
+            return False
+        
+        # 检查是否过期（自动解封）
+        block_time = self.blocked_ips[ip]
+        if time.time() - block_time > self.block_duration:
+            del self.blocked_ips[ip]
+            return False
+        
+        return True
     
     def unblock_ip(self, ip: str):
         """解封 IP"""
-        self.blocked_ips.discard(ip)
+        self.blocked_ips.pop(ip, None)
         self.ip_violations.pop(ip, None)
     
     def add_rule(self, name: str, pattern: str, action: str = "block"):
         """添加规则"""
         self.rules.append(WAFRule(name, pattern, action))
+    
+    def get_blocked_ips(self) -> List[Dict]:
+        """获取所有被封禁的 IP 列表"""
+        now = time.time()
+        result = []
+        expired = []
+        
+        for ip, block_time in self.blocked_ips.items():
+            remaining = self.block_duration - (now - block_time)
+            if remaining > 0:
+                result.append({
+                    "ip": ip,
+                    "blocked_at": datetime.fromtimestamp(block_time).isoformat(),
+                    "remaining_seconds": int(remaining),
+                    "violations": len(self.ip_violations.get(ip, []))
+                })
+            else:
+                expired.append(ip)
+        
+        # 清理过期的
+        for ip in expired:
+            del self.blocked_ips[ip]
+        
+        return result
+    
+    def get_stats(self) -> Dict:
+        """获取 WAF 统计信息"""
+        return {
+            "rules_count": len(self.rules),
+            "blocked_ips_count": len(self.get_blocked_ips()),
+            "violation_threshold": self.violation_threshold,
+            "block_duration_seconds": self.block_duration,
+            "active_violations": {
+                ip: len(violations) 
+                for ip, violations in self.ip_violations.items() 
+                if violations
+            }
+        }
+    
+    def clear_expired(self):
+        """清理过期的封禁和违规记录"""
+        now = time.time()
+        
+        # 清理过期封禁
+        expired_blocks = [
+            ip for ip, block_time in self.blocked_ips.items()
+            if now - block_time > self.block_duration
+        ]
+        for ip in expired_blocks:
+            del self.blocked_ips[ip]
+        
+        # 清理过期违规记录
+        for ip in list(self.ip_violations.keys()):
+            self.ip_violations[ip] = [
+                t for t in self.ip_violations[ip]
+                if now - t < self.violation_window
+            ]
+            if not self.ip_violations[ip]:
+                del self.ip_violations[ip]
+        
+        return len(expired_blocks)
 
 # ========== AI 攻击检测 ==========
 class AIAttackDetector:
@@ -194,6 +265,31 @@ class AIAttackDetector:
         
         max_count = max(word_counts.values())
         return max_count > len(words) * 0.3  # 超过30%重复
+    
+    def get_suspicious_users(self, min_count: int = 3) -> List[Dict]:
+        """获取可疑用户列表"""
+        return [
+            {"user_id": user_id, "threat_count": count}
+            for user_id, count in self.suspicious_users.items()
+            if count >= min_count
+        ]
+    
+    def clear_user_record(self, user_id: int):
+        """清除用户的可疑记录"""
+        self.suspicious_users.pop(user_id, None)
+    
+    def get_stats(self) -> Dict:
+        """获取 AI 攻击检测统计"""
+        return {
+            "patterns_count": len(self.patterns),
+            "suspicious_users_count": len(self.suspicious_users),
+            "total_threats_detected": sum(self.suspicious_users.values()),
+            "top_suspicious_users": sorted(
+                self.suspicious_users.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )[:10]
+        }
 
 
 # ========== 密钥轮换 ==========

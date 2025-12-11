@@ -125,7 +125,7 @@ function getActionTitle(action) {
 }
 
 // 监听来自 popup 的消息
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.action === 'chat') {
     handleChat(request.message).then(sendResponse);
     return true;
