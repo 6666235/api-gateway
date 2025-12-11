@@ -4,7 +4,7 @@
 """
 import re
 import html
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Tuple
 from pydantic import BaseModel, validator, Field
 import logging
 
@@ -38,7 +38,7 @@ class ValidationRules:
     SENSITIVE_WORDS = []
 
 # ========== 验证函数 ==========
-def validate_username(username: str) -> tuple[bool, str]:
+def validate_username(username: str) -> Tuple[bool, str]:
     """验证用户名"""
     if not username:
         return False, "用户名不能为空"
@@ -54,7 +54,7 @@ def validate_username(username: str) -> tuple[bool, str]:
     
     return True, ""
 
-def validate_password(password: str) -> tuple[bool, str]:
+def validate_password(password: str) -> Tuple[bool, str]:
     """验证密码强度"""
     if not password:
         return False, "密码不能为空"
@@ -79,7 +79,7 @@ def validate_password(password: str) -> tuple[bool, str]:
     
     return True, ""
 
-def validate_email(email: str) -> tuple[bool, str]:
+def validate_email(email: str) -> Tuple[bool, str]:
     """验证邮箱格式"""
     if not email:
         return True, ""  # 邮箱可选
@@ -89,7 +89,7 @@ def validate_email(email: str) -> tuple[bool, str]:
     
     return True, ""
 
-def validate_content(content: str, max_length: int = None) -> tuple[bool, str]:
+def validate_content(content: str, max_length: int = None) -> Tuple[bool, str]:
     """验证内容"""
     max_len = max_length or ValidationRules.MAX_MESSAGE_LENGTH
     
@@ -162,21 +162,21 @@ class SafeUserRegister(BaseModel):
     email: Optional[str] = None
     
     @validator('username')
-    def validate_username(cls, v):
+    def validate_username_field(cls, v):
         valid, msg = validate_username(v)
         if not valid:
             raise ValueError(msg)
         return v
     
     @validator('password')
-    def validate_password(cls, v):
+    def validate_password_field(cls, v):
         valid, msg = validate_password(v)
         if not valid:
             raise ValueError(msg)
         return v
     
     @validator('email')
-    def validate_email(cls, v):
+    def validate_email_field(cls, v):
         if v:
             valid, msg = validate_email(v)
             if not valid:
