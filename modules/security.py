@@ -555,8 +555,258 @@ class SecurityAuditor:
         
         return recommendations
 
+# ========== CSRF 防护 ==========
+class CSRFProtection:
+    """CSRF 防护"""
+    
+    def __init__(self, secret_key: str = None, token_ttl: int = 3600):
+        self.secret_key = secret_key or os.getenv("CSRF_SECRET", secrets.token_hex(32))
+        self.token_ttl = token_ttl
+        self._tokens: Dict[str, float] = {}  # token -> timestamp
+    
+    def generate_token(self, session_id: str = None) -> str:
+        """生成 CSRF Token"""
+        timestamp = str(int(time.time()))
+        random_part = secrets.token_hex(16)
+        
+        # 创建签名
+        data = f"{timestamp}:{random_part}:{session_id or ''}"
+        signature = hashlib.sha256(
+            f"{data}:{self.secret_key}".encode()
+        ).hexdigest()[:16]
+        
+        token = f"{timestamp}.{random_part}.{signature}"
+        self._tokens[token] = time.time()
+        
+        # 清理过期 token
+        self._cleanup()
+        
+        return token
+    
+    def validate_token(self, token: str, session_id: str = None) -> bool:
+        """验证 CSRF Token"""
+        if not token:
+            return False
+        
+        try:
+            parts = token.split('.')
+            if len(parts) != 3:
+                return False
+            
+            timestamp, random_part, signature = parts
+            
+            # 检查时间戳
+            token_time = int(timestamp)
+            if time.time() - token_time > self.token_ttl:
+                return False
+            
+            # 验证签名
+            data = f"{timestamp}:{random_part}:{session_id or ''}"
+            expected_signature = hashlib.sha256(
+                f"{data}:{self.secret_key}".encode()
+            ).hexdigest()[:16]
+            
+            return secrets.compare_digest(signature, expected_signature)
+        except:
+            return False
+    
+    def _cleanup(self):
+        """清理过期 token"""
+        now = time.time()
+        expired = [t for t, ts in self._tokens.items() if now - ts > self.token_ttl]
+        for t in expired:
+            del self._tokens[t]
+    
+    def get_stats(self) -> Dict:
+        """获取统计信息"""
+        return {
+            "active_tokens": len(self._tokens),
+            "token_ttl": self.token_ttl
+        }
+
+
+# ========== API 请求签名 ==========
+class RequestSigner:
+    """API 请求签名验证"""
+    
+    def __init__(self, secret_key: str = None, timestamp_tolerance: int = 300):
+        self.secret_key = secret_key or os.getenv("API_SIGN_SECRET", secrets.token_hex(32))
+        self.timestamp_tolerance = timestamp_tolerance  # 允许的时间偏差（秒）
+        self._used_nonces: Dict[str, float] = {}  # 防重放
+    
+    def sign_request(
+        self,
+        method: str,
+        path: str,
+        params: Dict = None,
+        body: str = None,
+        timestamp: int = None,
+        nonce: str = None
+    ) -> Dict[str, str]:
+        """
+        签名请求
+        返回需要添加到请求头的签名信息
+        """
+        timestamp = timestamp or int(time.time())
+        nonce = nonce or secrets.token_hex(16)
+        
+        # 构建签名字符串
+        sign_parts = [
+            method.upper(),
+            path,
+            str(timestamp),
+            nonce
+        ]
+        
+        if params:
+            sorted_params = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
+            sign_parts.append(sorted_params)
+        
+        if body:
+            body_hash = hashlib.sha256(body.encode()).hexdigest()
+            sign_parts.append(body_hash)
+        
+        sign_string = "\n".join(sign_parts)
+        
+        # 计算签名
+        signature = hashlib.sha256(
+            f"{sign_string}\n{self.secret_key}".encode()
+        ).hexdigest()
+        
+        return {
+            "X-Timestamp": str(timestamp),
+            "X-Nonce": nonce,
+            "X-Signature": signature
+        }
+    
+    def verify_request(
+        self,
+        method: str,
+        path: str,
+        timestamp: str,
+        nonce: str,
+        signature: str,
+        params: Dict = None,
+        body: str = None
+    ) -> tuple:
+        """
+        验证请求签名
+        返回 (is_valid, error_message)
+        """
+        try:
+            # 检查时间戳
+            ts = int(timestamp)
+            now = int(time.time())
+            if abs(now - ts) > self.timestamp_tolerance:
+                return False, "Timestamp expired"
+            
+            # 检查 nonce（防重放）
+            nonce_key = f"{nonce}:{timestamp}"
+            if nonce_key in self._used_nonces:
+                return False, "Nonce already used"
+            
+            # 重新计算签名
+            expected = self.sign_request(method, path, params, body, ts, nonce)
+            
+            if not secrets.compare_digest(signature, expected["X-Signature"]):
+                return False, "Invalid signature"
+            
+            # 记录 nonce
+            self._used_nonces[nonce_key] = time.time()
+            self._cleanup_nonces()
+            
+            return True, None
+        except Exception as e:
+            return False, str(e)
+    
+    def _cleanup_nonces(self):
+        """清理过期的 nonce"""
+        cutoff = time.time() - self.timestamp_tolerance * 2
+        expired = [k for k, v in self._used_nonces.items() if v < cutoff]
+        for k in expired:
+            del self._used_nonces[k]
+    
+    def get_stats(self) -> Dict:
+        """获取统计信息"""
+        return {
+            "active_nonces": len(self._used_nonces),
+            "timestamp_tolerance": self.timestamp_tolerance
+        }
+
+
+# ========== 敏感配置加密 ==========
+class SecureConfigManager:
+    """敏感配置加密管理"""
+    
+    def __init__(self, key: str = None):
+        self.key = key or os.getenv("CONFIG_ENCRYPTION_KEY")
+        if not self.key:
+            self.key = Fernet.generate_key().decode()
+        self.cipher = Fernet(self.key.encode() if isinstance(self.key, str) else self.key)
+    
+    def encrypt_value(self, value: str) -> str:
+        """加密配置值"""
+        if not value:
+            return value
+        return f"ENC:{self.cipher.encrypt(value.encode()).decode()}"
+    
+    def decrypt_value(self, encrypted: str) -> str:
+        """解密配置值"""
+        if not encrypted:
+            return encrypted
+        if not encrypted.startswith("ENC:"):
+            return encrypted  # 未加密的值
+        try:
+            return self.cipher.decrypt(encrypted[4:].encode()).decode()
+        except:
+            return encrypted
+    
+    def is_encrypted(self, value: str) -> bool:
+        """检查值是否已加密"""
+        return value and value.startswith("ENC:")
+    
+    def encrypt_env_file(self, env_path: str = ".env", keys_to_encrypt: List[str] = None):
+        """加密 .env 文件中的敏感配置"""
+        if keys_to_encrypt is None:
+            keys_to_encrypt = [
+                "API_KEY", "SECRET", "PASSWORD", "TOKEN", "PRIVATE_KEY"
+            ]
+        
+        if not os.path.exists(env_path):
+            return
+        
+        lines = []
+        with open(env_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if '=' in line and not line.startswith('#'):
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    
+                    # 检查是否需要加密
+                    should_encrypt = any(k in key.upper() for k in keys_to_encrypt)
+                    if should_encrypt and value and not self.is_encrypted(value):
+                        value = self.encrypt_value(value)
+                    
+                    lines.append(f"{key}={value}")
+                else:
+                    lines.append(line)
+        
+        with open(env_path, 'w') as f:
+            f.write('\n'.join(lines))
+    
+    def get_config(self, key: str, default: str = None) -> str:
+        """获取配置（自动解密）"""
+        value = os.getenv(key, default)
+        return self.decrypt_value(value) if value else default
+
+
 # 全局实例
 waf = WebApplicationFirewall()
 ai_detector = AIAttackDetector()
 key_manager = KeyRotationManager()
 auditor = SecurityAuditor()
+csrf_protection = CSRFProtection()
+request_signer = RequestSigner()
+secure_config = SecureConfigManager()

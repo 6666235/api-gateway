@@ -58,8 +58,8 @@ class Task:
         }
 
 class TaskQueue:
-    """异步任务队列"""
-    def __init__(self, max_workers: int = 5):
+    """异步任务队列（支持持久化）"""
+    def __init__(self, max_workers: int = 5, persist: bool = True, db_path: str = "data.db"):
         self._handlers: Dict[str, Callable] = {}
         self._tasks: Dict[str, Task] = {}
         self._queue: asyncio.PriorityQueue = None
@@ -67,6 +67,82 @@ class TaskQueue:
         self._max_workers = max_workers
         self._running = False
         self._stats = defaultdict(int)
+        self._persist = persist
+        self._db_path = db_path
+        
+        if persist:
+            self._init_persistence()
+    
+    def _init_persistence(self):
+        """初始化持久化存储"""
+        import sqlite3
+        with sqlite3.connect(self._db_path) as conn:
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS task_queue (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    args TEXT,
+                    kwargs TEXT,
+                    status TEXT DEFAULT 'pending',
+                    result TEXT,
+                    error TEXT,
+                    retries INTEGER DEFAULT 0,
+                    max_retries INTEGER DEFAULT 3,
+                    priority INTEGER DEFAULT 0,
+                    created_at REAL,
+                    started_at REAL,
+                    completed_at REAL,
+                    scheduled_at REAL
+                )
+            ''')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_task_status ON task_queue(status)')
+    
+    def _save_task(self, task: Task):
+        """保存任务到数据库"""
+        if not self._persist:
+            return
+        import sqlite3
+        with sqlite3.connect(self._db_path) as conn:
+            conn.execute('''
+                INSERT OR REPLACE INTO task_queue 
+                (id, name, args, kwargs, status, result, error, retries, max_retries, 
+                 priority, created_at, started_at, completed_at, scheduled_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                task.id, task.name, json.dumps(task.args), json.dumps(task.kwargs),
+                task.status.value, str(task.result)[:1000] if task.result else None,
+                task.error, task.retries, task.max_retries, task.priority,
+                task.created_at, task.started_at, task.completed_at, task.scheduled_at
+            ))
+    
+    def _load_pending_tasks(self):
+        """从数据库加载未完成的任务"""
+        if not self._persist:
+            return
+        import sqlite3
+        with sqlite3.connect(self._db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute('''
+                SELECT * FROM task_queue 
+                WHERE status IN ('pending', 'running', 'retrying')
+                ORDER BY priority DESC, created_at ASC
+            ''').fetchall()
+            
+            for row in rows:
+                task = Task(
+                    id=row['id'],
+                    name=row['name'],
+                    args=tuple(json.loads(row['args'] or '[]')),
+                    kwargs=json.loads(row['kwargs'] or '{}'),
+                    status=TaskStatus(row['status']),
+                    retries=row['retries'],
+                    max_retries=row['max_retries'],
+                    priority=row['priority'],
+                    created_at=row['created_at'],
+                    scheduled_at=row['scheduled_at']
+                )
+                self._tasks[task.id] = task
+                logger.info(f"Restored task from persistence: {task.id}")
     
     def register(self, name: str, handler: Callable, max_retries: int = 3):
         """注册任务处理器"""
@@ -102,6 +178,7 @@ class TaskQueue:
         )
         
         self._tasks[task_id] = task
+        self._save_task(task)  # 持久化
         
         if self._queue:
             # 优先级队列使用负数（越小越优先）
@@ -186,6 +263,9 @@ class TaskQueue:
                 task.completed_at = time.time()
                 self._stats["failed"] += 1
                 logger.error(f"Task failed: {task.name} ({task.id}): {e}")
+        
+        # 持久化任务状态
+        self._save_task(task)
     
     async def start(self):
         """启动队列"""
@@ -195,12 +275,18 @@ class TaskQueue:
         self._running = True
         self._queue = asyncio.PriorityQueue()
         
+        # 从持久化存储恢复任务
+        self._load_pending_tasks()
+        for task_id, task in self._tasks.items():
+            if task.status in (TaskStatus.PENDING, TaskStatus.RETRYING):
+                await self._queue.put((-task.priority, task_id))
+        
         # 启动工作协程
         for i in range(self._max_workers):
             worker = asyncio.create_task(self._worker(i))
             self._workers.append(worker)
         
-        logger.info(f"Task queue started with {self._max_workers} workers")
+        logger.info(f"Task queue started with {self._max_workers} workers, restored {len(self._tasks)} tasks")
     
     async def stop(self):
         """停止队列"""

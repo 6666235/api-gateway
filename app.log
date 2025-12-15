@@ -63,3 +63,375 @@
 2025-12-11 00:44:48,532 - WARNING - [__main__] Request failed: {"request_id": "4f37acade465b12b", "method": "GET", "path": "/api/billing/invoices", "status": 401, "duration_ms": 7.03, "client_ip": "127.0.0.1"}
 2025-12-11 00:45:04,933 - WARNING - [__main__] Request failed: {"request_id": "7529bfc5f9bd98b2", "method": "GET", "path": "/static/icon-192.png", "status": 404, "duration_ms": 3.0, "client_ip": "127.0.0.1"}
 2025-12-11 00:45:21,949 - WARNING - [__main__] Slow request: {"request_id": "6bc3364af4908eff", "method": "GET", "path": "/api/ollama/models", "status": 200, "duration_ms": 3094.77, "client_ip": "127.0.0.1"}
+2025-12-11 21:50:25,667 - WARNING - [__main__] Request failed: {"request_id": "2d0fc7cf9871013f", "method": "GET", "path": "/static/icon-192.png", "status": 404, "duration_ms": 6.53, "client_ip": "127.0.0.1"}
+2025-12-11 21:52:46,224 - INFO - [__main__] AI Hub starting...
+2025-12-11 21:52:46,229 - INFO - [__main__] Extended database tables initialized
+2025-12-11 21:52:50,540 - INFO - [__main__] ✅ 使用 FakeRedis 内存缓存（功能完整）
+2025-12-11 21:52:50,553 - WARNING - [__main__] ⚠️ 扩展模块未加载: No module named 'psutil'
+2025-12-11 21:52:50,645 - INFO - [__main__] Task queue started
+2025-12-11 21:52:50,647 - WARNING - [__main__] Scheduler start failed: No module named 'psutil'
+2025-12-11 21:52:50,647 - INFO - [__main__] AI Hub started successfully
+2025-12-12 00:04:25 - [32mINFO[0m - [main] AI Hub starting...
+2025-12-12 00:04:25 - [32mINFO[0m - [main] Custom middlewares added
+2025-12-12 00:04:25 - [32mINFO[0m - [main] Extended database tables initialized
+2025-12-12 00:04:29 - [32mINFO[0m - [main] ✅ 使用 FakeRedis 内存缓存（功能完整）
+2025-12-12 00:04:29 - [32mINFO[0m - [main] ✅ 扩展模块已加载: RBAC, 计费, RAG, 协作, 安全, 企业功能
+2025-12-12 00:08:57 - INFO - [main] AI Hub starting...
+2025-12-12 00:08:57 - INFO - [main] Custom middlewares added
+2025-12-12 00:08:57 - INFO - [main] Extended database tables initialized
+2025-12-12 00:09:02 - INFO - [main] ✅ 使用 FakeRedis 内存缓存（功能完整）
+2025-12-12 00:09:02 - INFO - [main] ✅ 扩展模块已加载: RBAC, 计费, RAG, 协作, 安全, 企业功能
+2025-12-12 00:09:02 - INFO - [modules.db_pool] aiosqlite available, using async database operations
+2025-12-12 00:09:02 - INFO - [modules.db_pool] Enhanced async database pool initialized: 3 connections
+2025-12-12 00:09:02 - INFO - [modules.db_pool] Enhanced database pool closed
+2025-12-12 00:09:02 - INFO - [modules.db_pool] Enhanced async database pool initialized: 2 connections
+2025-12-12 00:09:02 - INFO - [modules.db_pool] Enhanced database pool closed
+2025-12-12 00:09:02 - INFO - [modules.db_pool] Enhanced async database pool initialized: 2 connections
+2025-12-12 00:09:02 - INFO - [modules.db_pool] Enhanced database pool closed
+2025-12-12 00:09:04 - INFO - [modules.queue] Scheduled job added: cleanup_sessions
+2025-12-12 00:09:04 - INFO - [modules.queue] Scheduled job added: cleanup_logs
+2025-12-12 00:09:04 - INFO - [modules.queue] Scheduled job added: update_stats
+2025-12-12 00:09:04 - INFO - [modules.queue] Registered task handler: test_task
+2025-12-12 00:09:04 - INFO - [modules.queue] Task queue started with 2 workers, restored 0 tasks
+2025-12-12 00:09:04 - INFO - [modules.queue] Worker 0 started
+2025-12-12 00:09:04 - INFO - [modules.queue] Worker 1 started
+2025-12-12 00:09:04 - INFO - [modules.queue] Task queue stopped
+2025-12-12 00:09:04 - INFO - [modules.queue] Registered task handler: priority_task
+2025-12-12 00:09:04 - INFO - [modules.queue] Task queue started with 1 workers, restored 2 tasks
+2025-12-12 00:09:04 - INFO - [modules.queue] Worker 0 started
+2025-12-12 00:09:05 - INFO - [modules.queue] Task queue stopped
+2025-12-12 00:09:05 - INFO - [test_request] {"request_id": null, "method": "GET", "path": "/api/test", "status": 200, "duration_ms": 50.5, "client_ip": "127.0.0.1", "user_id": 1}
+2025-12-12 00:09:05 - WARNING - [modules.decorators] Retry 1/3 for flaky_func: Temporary error
+2025-12-12 00:09:05 - WARNING - [modules.decorators] Retry 2/3 for flaky_func: Temporary error
+2025-12-12 00:25:34 - [32mINFO[0m - [__main__] AI Hub starting...
+2025-12-12 00:25:34 - [32mINFO[0m - [__main__] Custom middlewares added
+2025-12-12 00:25:34 - [32mINFO[0m - [__main__] Extended database tables initialized
+2025-12-12 00:25:39 - [32mINFO[0m - [__main__] ✅ 使用 FakeRedis 内存缓存（功能完整）
+2025-12-12 00:25:39 - [32mINFO[0m - [__main__] ✅ 扩展模块已加载: RBAC, 计费, RAG, 协作, 安全, 企业功能
+2025-12-12 00:25:39 - [32mINFO[0m - [__main__] Advanced logging initialized
+2025-12-12 00:25:39 - [32mINFO[0m - [modules.db_pool] aiosqlite available, using async database operations
+2025-12-12 00:25:39 - [32mINFO[0m - [modules.db_pool] Enhanced async database pool initialized: 10 connections
+2025-12-12 00:25:39 - [32mINFO[0m - [__main__] Async database pool initialized
+2025-12-12 00:25:39 - [32mINFO[0m - [__main__] Task queue started
+2025-12-12 00:25:39 - [32mINFO[0m - [modules.queue] Scheduled job added: cleanup_sessions
+2025-12-12 00:25:39 - [32mINFO[0m - [modules.queue] Scheduled job added: cleanup_logs
+2025-12-12 00:25:39 - [32mINFO[0m - [modules.queue] Scheduled job added: update_stats
+2025-12-12 00:25:39 - [32mINFO[0m - [modules.queue] Scheduler started
+2025-12-12 00:25:39 - [32mINFO[0m - [__main__] Graceful shutdown handlers registered
+2025-12-12 00:25:39 - [32mINFO[0m - [__main__] AI Hub started successfully
+2025-12-12 00:26:24 - [32mINFO[0m - [modules.middleware] [b1343d72] GET /
+2025-12-12 00:26:25 - [32mINFO[0m - [modules.middleware] [b1343d72] 200 305.93ms
+2025-12-12 00:26:25 - [32mINFO[0m - [modules.middleware] [30554c61] GET /static/manifest.json
+2025-12-12 00:26:25 - [32mINFO[0m - [modules.middleware] [30554c61] 200 8.01ms
+2025-12-12 00:26:25 - [32mINFO[0m - [modules.middleware] [d720e017] GET /static/icon.svg
+2025-12-12 00:26:25 - [32mINFO[0m - [modules.middleware] [d720e017] 200 5.00ms
+2025-12-12 00:28:11 - [32mINFO[0m - [modules.middleware] [6b6ae6b6] POST /api/chat
+2025-12-12 00:28:11 - [32mINFO[0m - [modules.middleware] [6b6ae6b6] 404 1.25ms
+2025-12-12 00:28:11 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "711e4e3a9a332fa1", "method": "POST", "path": "/api/chat", "status": 404, "duration_ms": 2.3, "client_ip": "127.0.0.1"}
+2025-12-12 00:29:15 - [32mINFO[0m - [modules.middleware] [3a2b4eee] POST /v1/chat/completions
+2025-12-12 00:29:15 - [32mINFO[0m - [modules.middleware] [3a2b4eee] 500 14.28ms
+2025-12-12 00:29:15 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "cc804abd2ab4cd5f", "method": "POST", "path": "/v1/chat/completions", "status": 500, "duration_ms": 14.28, "client_ip": "127.0.0.1"}
+2025-12-12 00:45:21 - [32mINFO[0m - [modules.middleware] [813c469d] GET /
+2025-12-12 00:45:21 - [32mINFO[0m - [modules.middleware] [813c469d] 200 7.01ms
+2025-12-12 00:45:21 - [32mINFO[0m - [modules.middleware] [a129b258] GET /static/manifest.json
+2025-12-12 00:45:21 - [32mINFO[0m - [modules.middleware] [a129b258] 304 5.00ms
+2025-12-12 00:45:21 - [32mINFO[0m - [modules.middleware] [aa166868] GET /static/icon.svg
+2025-12-12 00:45:21 - [32mINFO[0m - [modules.middleware] [aa166868] 304 5.01ms
+2025-12-12 00:45:41 - [32mINFO[0m - [modules.middleware] [7a69b928] POST /api/proxy/test
+2025-12-12 00:45:42 - [32mINFO[0m - [modules.middleware] [e309af49] POST /api/proxy/test
+2025-12-12 00:45:43 - [32mINFO[0m - [modules.middleware] [8ab42f5e] POST /api/proxy/test
+2025-12-12 00:45:43 - [32mINFO[0m - [modules.middleware] [d8b51012] POST /api/proxy/test
+2025-12-12 00:45:45 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/models "HTTP/1.1 200 OK"
+2025-12-12 00:45:45 - [32mINFO[0m - [modules.middleware] [7a69b928] 200 4093.03ms
+2025-12-12 00:45:45 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 4093.03ms
+2025-12-12 00:45:45 - [32mINFO[0m - [modules.middleware] [f0c69479] POST /api/proxy/test
+2025-12-12 00:45:45 - [32mINFO[0m - [modules.middleware] [51321611] POST /api/proxy/test
+2025-12-12 00:45:45 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "b181791de66bdc5d", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 4105.13, "client_ip": "127.0.0.1"}
+2025-12-12 00:45:47 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/models "HTTP/1.1 200 OK"
+2025-12-12 00:45:47 - [32mINFO[0m - [modules.middleware] [1c0b82f2] POST /api/proxy/test
+2025-12-12 00:45:47 - [32mINFO[0m - [modules.middleware] [e309af49] 200 4770.14ms
+2025-12-12 00:45:47 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 4770.14ms
+2025-12-12 00:45:47 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "4b764c23525b07e2", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 4778.52, "client_ip": "127.0.0.1"}
+2025-12-12 00:45:48 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/models "HTTP/1.1 200 OK"
+2025-12-12 00:45:48 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/models "HTTP/1.1 200 OK"
+2025-12-12 00:45:48 - [32mINFO[0m - [modules.middleware] [d8b51012] 200 4948.22ms
+2025-12-12 00:45:48 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 4948.22ms
+2025-12-12 00:45:48 - [32mINFO[0m - [modules.middleware] [8ab42f5e] 200 4953.68ms
+2025-12-12 00:45:48 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 4953.68ms
+2025-12-12 00:45:48 - [32mINFO[0m - [modules.middleware] [8369d0dd] POST /api/proxy/test
+2025-12-12 00:45:48 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "92ebb6e7860ad4dc", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 4972.38, "client_ip": "127.0.0.1"}
+2025-12-12 00:45:48 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "b6e57c7cdf433d7a", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 4977.37, "client_ip": "127.0.0.1"}
+2025-12-12 00:45:49 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/models "HTTP/1.1 200 OK"
+2025-12-12 00:45:49 - [32mINFO[0m - [modules.middleware] [e0f70e38] POST /api/proxy/test
+2025-12-12 00:45:49 - [32mINFO[0m - [modules.middleware] [f0c69479] 200 3966.93ms
+2025-12-12 00:45:49 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 3966.93ms
+2025-12-12 00:45:49 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "c9113f57a8c104b6", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 3991.24, "client_ip": "127.0.0.1"}
+2025-12-12 00:45:50 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/models "HTTP/1.1 200 OK"
+2025-12-12 00:45:50 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/models "HTTP/1.1 200 OK"
+2025-12-12 00:45:50 - [32mINFO[0m - [modules.middleware] [1c0b82f2] 200 3009.42ms
+2025-12-12 00:45:50 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 3009.42ms
+2025-12-12 00:45:50 - [32mINFO[0m - [modules.middleware] [51321611] 200 5001.28ms
+2025-12-12 00:45:50 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 5001.28ms
+2025-12-12 00:45:50 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "003e8bb8704be1ae", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 4000.63, "client_ip": "127.0.0.1"}
+2025-12-12 00:45:50 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "f25dae153c23720a", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 5026.23, "client_ip": "127.0.0.1"}
+2025-12-12 00:45:51 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/models "HTTP/1.1 200 OK"
+2025-12-12 00:45:51 - [32mINFO[0m - [modules.middleware] [8369d0dd] 200 2595.87ms
+2025-12-12 00:45:51 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 2595.87ms
+2025-12-12 00:45:51 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "eaedd169489eb824", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 2606.84, "client_ip": "127.0.0.1"}
+2025-12-12 00:45:51 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/models "HTTP/1.1 200 OK"
+2025-12-12 00:45:51 - [32mINFO[0m - [modules.middleware] [e0f70e38] 200 1954.38ms
+2025-12-12 00:45:51 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 1954.38ms
+2025-12-12 00:45:51 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "4983d65477001c28", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 1981.61, "client_ip": "127.0.0.1"}
+2025-12-12 00:46:04 - [32mINFO[0m - [modules.middleware] [d267a410] GET /api/auth/github
+2025-12-12 00:46:04 - [32mINFO[0m - [modules.middleware] [d267a410] 500 2.99ms
+2025-12-12 00:46:04 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "ad93184f2978abbe", "method": "GET", "path": "/api/auth/github", "status": 500, "duration_ms": 7.01, "client_ip": "127.0.0.1"}
+2025-12-12 22:52:52 - [32mINFO[0m - [__main__] AI Hub starting...
+2025-12-12 22:52:52 - [32mINFO[0m - [__main__] Custom middlewares added
+2025-12-12 22:52:52 - [32mINFO[0m - [__main__] Extended database tables initialized
+2025-12-12 22:52:57 - [32mINFO[0m - [__main__] ✅ 使用 FakeRedis 内存缓存（功能完整）
+2025-12-12 22:52:57 - [32mINFO[0m - [__main__] ✅ 扩展模块已加载: RBAC, 计费, RAG, 协作, 安全, 企业功能
+2025-12-12 22:52:57 - [32mINFO[0m - [__main__] Advanced logging initialized
+2025-12-12 22:52:57 - [32mINFO[0m - [modules.db_pool] aiosqlite available, using async database operations
+2025-12-12 22:52:57 - [32mINFO[0m - [modules.db_pool] Enhanced async database pool initialized: 10 connections
+2025-12-12 22:52:57 - [32mINFO[0m - [__main__] Async database pool initialized
+2025-12-12 22:52:57 - [32mINFO[0m - [__main__] Task queue started
+2025-12-12 22:52:57 - [32mINFO[0m - [modules.queue] Scheduled job added: cleanup_sessions
+2025-12-12 22:52:57 - [32mINFO[0m - [modules.queue] Scheduled job added: cleanup_logs
+2025-12-12 22:52:57 - [32mINFO[0m - [modules.queue] Scheduled job added: update_stats
+2025-12-12 22:52:57 - [32mINFO[0m - [modules.queue] Scheduler started
+2025-12-12 22:52:57 - [32mINFO[0m - [__main__] Graceful shutdown handlers registered
+2025-12-12 22:52:57 - [32mINFO[0m - [__main__] AI Hub started successfully
+2025-12-12 22:55:39 - [32mINFO[0m - [modules.middleware] [64b26e6d] GET /
+2025-12-12 22:55:40 - [32mINFO[0m - [modules.middleware] [64b26e6d] 200 464.49ms
+2025-12-12 22:55:41 - [32mINFO[0m - [modules.middleware] [84271666] GET /favicon.ico
+2025-12-12 22:55:41 - [32mINFO[0m - [modules.middleware] [84271666] 404 2.36ms
+2025-12-12 22:55:41 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "0b0379480964a2b5", "method": "GET", "path": "/favicon.ico", "status": 404, "duration_ms": 5.25, "client_ip": "127.0.0.1"}
+2025-12-12 22:56:13 - [32mINFO[0m - [modules.middleware] [34719b83] GET /api/auth/github
+2025-12-12 22:56:13 - [32mINFO[0m - [modules.middleware] [34719b83] 500 5.00ms
+2025-12-12 22:56:13 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "c4baa0cc6e684c19", "method": "GET", "path": "/api/auth/github", "status": 500, "duration_ms": 8.28, "client_ip": "127.0.0.1"}
+2025-12-12 22:57:26 - [32mINFO[0m - [modules.middleware] [f3e09ce4] POST /api/proxy/test
+2025-12-12 22:57:29 - [32mINFO[0m - [modules.middleware] [73756ed9] POST /api/proxy/test
+2025-12-12 22:57:30 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/models "HTTP/1.1 200 OK"
+2025-12-12 22:57:30 - [32mINFO[0m - [modules.middleware] [f3e09ce4] 200 4151.91ms
+2025-12-12 22:57:30 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 4151.91ms
+2025-12-12 22:57:30 - [32mINFO[0m - [modules.middleware] [bcf46100] POST /api/proxy/test
+2025-12-12 22:57:30 - [32mINFO[0m - [modules.middleware] [f4655340] POST /api/proxy/test
+2025-12-12 22:57:30 - [32mINFO[0m - [modules.middleware] [a46a9ae7] POST /api/proxy/test
+2025-12-12 22:57:30 - [32mINFO[0m - [modules.middleware] [dd32ba33] POST /api/proxy/test
+2025-12-12 22:57:30 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "a2558078b9171345", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 4190.72, "client_ip": "127.0.0.1"}
+2025-12-12 22:57:35 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/models "HTTP/1.1 200 OK"
+2025-12-12 22:57:35 - [32mINFO[0m - [modules.middleware] [73756ed9] 200 6360.83ms
+2025-12-12 22:57:35 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 6360.83ms
+2025-12-12 22:57:35 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "48e5fe9e3468f99f", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 6367.51, "client_ip": "127.0.0.1"}
+2025-12-12 22:57:36 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/models "HTTP/1.1 200 OK"
+2025-12-12 22:57:36 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/models "HTTP/1.1 200 OK"
+2025-12-12 22:57:36 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/models "HTTP/1.1 200 OK"
+2025-12-12 22:57:36 - [32mINFO[0m - [modules.middleware] [dd32ba33] 200 6221.10ms
+2025-12-12 22:57:36 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 6221.10ms
+2025-12-12 22:57:36 - [32mINFO[0m - [modules.middleware] [a46a9ae7] 200 6230.80ms
+2025-12-12 22:57:36 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 6230.80ms
+2025-12-12 22:57:36 - [32mINFO[0m - [modules.middleware] [f4655340] 200 6243.91ms
+2025-12-12 22:57:36 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 6243.91ms
+2025-12-12 22:57:36 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "236e2e130dc1c48a", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 6258.78, "client_ip": "127.0.0.1"}
+2025-12-12 22:57:36 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "347968253dd419ff", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 6262.89, "client_ip": "127.0.0.1"}
+2025-12-12 22:57:36 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "1380363c847aa9d5", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 6281.52, "client_ip": "127.0.0.1"}
+2025-12-12 22:57:37 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/models "HTTP/1.1 200 OK"
+2025-12-12 22:57:37 - [32mINFO[0m - [modules.middleware] [bcf46100] 200 6410.96ms
+2025-12-12 22:57:37 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 6410.96ms
+2025-12-12 22:57:37 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "ef4ddbb87cf4c5e6", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 6447.16, "client_ip": "127.0.0.1"}
+2025-12-12 22:58:37 - [32mINFO[0m - [modules.middleware] [1e4d947c] POST /v1/chat/completions
+2025-12-12 22:58:37 - [32mINFO[0m - [modules.middleware] [1e4d947c] 400 78.08ms
+2025-12-12 22:58:37 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "0e81a82bbcbdd859", "method": "POST", "path": "/v1/chat/completions", "status": 400, "duration_ms": 81.07, "client_ip": "127.0.0.1"}
+2025-12-12 22:58:57 - [32mINFO[0m - [modules.middleware] [fbc92357] POST /api/proxy/test
+2025-12-12 22:59:00 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/v1/models "HTTP/1.1 200 OK"
+2025-12-12 22:59:00 - [32mINFO[0m - [modules.middleware] [fbc92357] 200 2821.38ms
+2025-12-12 22:59:00 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 2821.38ms
+2025-12-12 22:59:00 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "1b34504f4c323b4e", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 2827.35, "client_ip": "127.0.0.1"}
+2025-12-12 22:59:06 - [32mINFO[0m - [modules.middleware] [84f41216] POST /v1/chat/completions
+2025-12-12 22:59:06 - [32mINFO[0m - [modules.middleware] [84f41216] 400 18.91ms
+2025-12-12 22:59:06 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "e16adddf516634b8", "method": "POST", "path": "/v1/chat/completions", "status": 400, "duration_ms": 22.83, "client_ip": "127.0.0.1"}
+2025-12-12 22:59:17 - [32mINFO[0m - [modules.middleware] [8e65dc43] POST /api/proxy/test
+2025-12-12 22:59:20 - [32mINFO[0m - [httpx] HTTP Request: GET https://api.codexzh.com/v1/models "HTTP/1.1 200 OK"
+2025-12-12 22:59:20 - [32mINFO[0m - [modules.middleware] [8e65dc43] 200 2885.70ms
+2025-12-12 22:59:20 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /api/proxy/test took 2885.70ms
+2025-12-12 22:59:20 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "8144404024d5f223", "method": "POST", "path": "/api/proxy/test", "status": 200, "duration_ms": 2889.13, "client_ip": "127.0.0.1"}
+2025-12-12 22:59:26 - [32mINFO[0m - [modules.middleware] [34cbfee7] POST /v1/chat/completions
+2025-12-12 22:59:26 - [32mINFO[0m - [modules.middleware] [34cbfee7] 400 17.02ms
+2025-12-12 22:59:26 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "881b86cd24daef26", "method": "POST", "path": "/v1/chat/completions", "status": 400, "duration_ms": 20.08, "client_ip": "127.0.0.1"}
+2025-12-12 23:01:37 - [32mINFO[0m - [__main__] AI Hub starting...
+2025-12-12 23:01:37 - [32mINFO[0m - [__main__] Custom middlewares added
+2025-12-12 23:01:37 - [32mINFO[0m - [__main__] Extended database tables initialized
+2025-12-12 23:01:42 - [32mINFO[0m - [__main__] ✅ 使用 FakeRedis 内存缓存（功能完整）
+2025-12-12 23:01:42 - [32mINFO[0m - [__main__] ✅ 扩展模块已加载: RBAC, 计费, RAG, 协作, 安全, 企业功能
+2025-12-12 23:01:42 - [32mINFO[0m - [__main__] Advanced logging initialized
+2025-12-12 23:01:42 - [32mINFO[0m - [modules.db_pool] aiosqlite available, using async database operations
+2025-12-12 23:01:42 - [32mINFO[0m - [modules.db_pool] Enhanced async database pool initialized: 10 connections
+2025-12-12 23:01:42 - [32mINFO[0m - [__main__] Async database pool initialized
+2025-12-12 23:01:42 - [32mINFO[0m - [__main__] Task queue started
+2025-12-12 23:01:42 - [32mINFO[0m - [modules.queue] Scheduled job added: cleanup_sessions
+2025-12-12 23:01:42 - [32mINFO[0m - [modules.queue] Scheduled job added: cleanup_logs
+2025-12-12 23:01:42 - [32mINFO[0m - [modules.queue] Scheduled job added: update_stats
+2025-12-12 23:01:42 - [32mINFO[0m - [modules.queue] Scheduler started
+2025-12-12 23:01:42 - [32mINFO[0m - [__main__] Graceful shutdown handlers registered
+2025-12-12 23:01:42 - [32mINFO[0m - [__main__] AI Hub started successfully
+2025-12-12 23:02:37 - [32mINFO[0m - [modules.middleware] [d17c7257] GET /
+2025-12-12 23:02:38 - [32mINFO[0m - [modules.middleware] [d17c7257] 200 446.16ms
+2025-12-12 23:02:55 - [32mINFO[0m - [modules.middleware] [423e6e3c] POST /v1/chat/completions
+2025-12-12 23:02:55 - [32mINFO[0m - [modules.middleware] [423e6e3c] 400 34.09ms
+2025-12-12 23:02:55 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "ae1c3e8c4e4e4be5", "method": "POST", "path": "/v1/chat/completions", "status": 400, "duration_ms": 42.14, "client_ip": "127.0.0.1"}
+2025-12-12 23:03:07 - [32mINFO[0m - [modules.middleware] [ae044543] POST /v1/chat/completions
+2025-12-12 23:03:07 - [32mINFO[0m - [modules.middleware] [ae044543] 400 14.12ms
+2025-12-12 23:03:07 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "277c355af191c8e6", "method": "POST", "path": "/v1/chat/completions", "status": 400, "duration_ms": 18.07, "client_ip": "127.0.0.1"}
+2025-12-12 23:06:20 - [32mINFO[0m - [modules.middleware] [872a0498] POST /v1/chat/completions
+2025-12-12 23:06:20 - [32mINFO[0m - [modules.middleware] [872a0498] 400 14.30ms
+2025-12-12 23:06:20 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "718f77e1dc2969db", "method": "POST", "path": "/v1/chat/completions", "status": 400, "duration_ms": 17.3, "client_ip": "127.0.0.1"}
+2025-12-12 23:06:27 - [32mINFO[0m - [modules.middleware] [a7ee1630] GET /.well-known/appspecific/com.chrome.devtools.json
+2025-12-12 23:06:27 - [32mINFO[0m - [modules.middleware] [a7ee1630] 404 2.01ms
+2025-12-12 23:06:27 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "5f9936737f9e37a7", "method": "GET", "path": "/.well-known/appspecific/com.chrome.devtools.json", "status": 404, "duration_ms": 5.01, "client_ip": "127.0.0.1"}
+2025-12-12 23:06:27 - [32mINFO[0m - [modules.middleware] [dde705bd] GET /static/manifest.json
+2025-12-12 23:06:27 - [32mINFO[0m - [modules.middleware] [dde705bd] 200 8.22ms
+2025-12-12 23:09:22 - [32mINFO[0m - [__main__] AI Hub starting...
+2025-12-12 23:09:22 - [32mINFO[0m - [__main__] Custom middlewares added
+2025-12-12 23:09:22 - [32mINFO[0m - [__main__] Extended database tables initialized
+2025-12-12 23:09:27 - [32mINFO[0m - [__main__] ✅ 使用 FakeRedis 内存缓存（功能完整）
+2025-12-12 23:09:27 - [32mINFO[0m - [__main__] ✅ 扩展模块已加载: RBAC, 计费, RAG, 协作, 安全, 企业功能
+2025-12-12 23:09:27 - [32mINFO[0m - [__main__] Advanced logging initialized
+2025-12-12 23:09:27 - [32mINFO[0m - [modules.db_pool] aiosqlite available, using async database operations
+2025-12-12 23:09:27 - [32mINFO[0m - [modules.db_pool] Enhanced async database pool initialized: 10 connections
+2025-12-12 23:09:27 - [32mINFO[0m - [__main__] Async database pool initialized
+2025-12-12 23:09:27 - [32mINFO[0m - [__main__] Task queue started
+2025-12-12 23:09:27 - [32mINFO[0m - [modules.queue] Scheduled job added: cleanup_sessions
+2025-12-12 23:09:27 - [32mINFO[0m - [modules.queue] Scheduled job added: cleanup_logs
+2025-12-12 23:09:27 - [32mINFO[0m - [modules.queue] Scheduled job added: update_stats
+2025-12-12 23:09:27 - [32mINFO[0m - [modules.queue] Scheduler started
+2025-12-12 23:09:27 - [32mINFO[0m - [__main__] Graceful shutdown handlers registered
+2025-12-12 23:09:27 - [32mINFO[0m - [__main__] AI Hub started successfully
+2025-12-12 23:12:43 - [32mINFO[0m - [modules.middleware] [eaab2103] GET /
+2025-12-12 23:12:43 - [32mINFO[0m - [modules.middleware] [eaab2103] 200 468.60ms
+2025-12-12 23:12:43 - [32mINFO[0m - [modules.middleware] [e7d0bd3e] GET /.well-known/appspecific/com.chrome.devtools.json
+2025-12-12 23:12:43 - [32mINFO[0m - [modules.middleware] [e7d0bd3e] 404 4.00ms
+2025-12-12 23:12:43 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "f41ca6f2618873f3", "method": "GET", "path": "/.well-known/appspecific/com.chrome.devtools.json", "status": 404, "duration_ms": 6.51, "client_ip": "127.0.0.1"}
+2025-12-12 23:13:00 - [32mINFO[0m - [modules.middleware] [4697844e] GET /
+2025-12-12 23:13:00 - [32mINFO[0m - [modules.middleware] [4697844e] 200 3.44ms
+2025-12-12 23:13:10 - [32mINFO[0m - [modules.middleware] [5c724d26] POST /v1/chat/completions
+2025-12-12 23:13:10 - [32mINFO[0m - [__main__] Chat request: provider=p_1765551430245, model=gpt-5-high, custom_url=, has_api_key=False
+2025-12-12 23:13:10 - [32mINFO[0m - [modules.middleware] [5c724d26] 400 37.01ms
+2025-12-12 23:13:10 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "98ca2a0cdf4cf3bb", "method": "POST", "path": "/v1/chat/completions", "status": 400, "duration_ms": 40.01, "client_ip": "127.0.0.1"}
+2025-12-12 23:13:23 - [32mINFO[0m - [modules.middleware] [6291fbbb] GET /.well-known/appspecific/com.chrome.devtools.json
+2025-12-12 23:13:23 - [32mINFO[0m - [modules.middleware] [6291fbbb] 404 1.75ms
+2025-12-12 23:13:23 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "15cffbefe00fe200", "method": "GET", "path": "/.well-known/appspecific/com.chrome.devtools.json", "status": 404, "duration_ms": 4.11, "client_ip": "127.0.0.1"}
+2025-12-12 23:18:08 - [32mINFO[0m - [modules.middleware] [ada3b859] GET /
+2025-12-12 23:18:08 - [32mINFO[0m - [modules.middleware] [ada3b859] 200 17.54ms
+2025-12-12 23:18:17 - [32mINFO[0m - [modules.middleware] [b2d0ed2f] POST /v1/chat/completions
+2025-12-12 23:18:17 - [32mINFO[0m - [__main__] Chat request: provider=p_1765551430245, model=gpt-5-high, custom_url=, has_api_key=False
+2025-12-12 23:18:17 - [32mINFO[0m - [modules.middleware] [b2d0ed2f] 400 10.00ms
+2025-12-12 23:18:17 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "984be323602ea585", "method": "POST", "path": "/v1/chat/completions", "status": 400, "duration_ms": 13.0, "client_ip": "127.0.0.1"}
+2025-12-12 23:19:03 - [32mINFO[0m - [modules.middleware] [ea912cc8] GET /
+2025-12-12 23:19:03 - [32mINFO[0m - [modules.middleware] [ea912cc8] 200 3.01ms
+2025-12-12 23:19:14 - [32mINFO[0m - [modules.middleware] [51c039b5] POST /v1/chat/completions
+2025-12-12 23:19:14 - [32mINFO[0m - [__main__] Chat request: provider=p_1765551430245, model=gpt-5-high, custom_url=https://api.codexzh.com, has_api_key=True
+2025-12-12 23:19:29 - [32mINFO[0m - [httpx] HTTP Request: POST https://api.codexzh.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-12-12 23:19:29 - [32mINFO[0m - [modules.middleware] [51c039b5] 200 14633.55ms
+2025-12-12 23:19:29 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /v1/chat/completions took 14633.55ms
+2025-12-12 23:19:29 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "3d0ee2dd4fa625e3", "method": "POST", "path": "/v1/chat/completions", "status": 200, "duration_ms": 14638.76, "client_ip": "127.0.0.1"}
+2025-12-12 23:19:40 - [32mINFO[0m - [modules.middleware] [bed9073b] POST /v1/chat/completions
+2025-12-12 23:19:40 - [32mINFO[0m - [__main__] Chat request: provider=p_1765551430245, model=gpt-5-high, custom_url=https://api.codexzh.com, has_api_key=True
+2025-12-12 23:19:51 - [32mINFO[0m - [httpx] HTTP Request: POST https://api.codexzh.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-12-12 23:19:51 - [32mINFO[0m - [modules.middleware] [bed9073b] 200 10664.91ms
+2025-12-12 23:19:51 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /v1/chat/completions took 10664.91ms
+2025-12-12 23:19:51 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "027e0573d3f1040a", "method": "POST", "path": "/v1/chat/completions", "status": 200, "duration_ms": 10674.4, "client_ip": "127.0.0.1"}
+2025-12-12 23:22:45 - [32mINFO[0m - [modules.middleware] [be787c39] POST /v1/chat/completions
+2025-12-12 23:22:45 - [32mINFO[0m - [__main__] Chat request: provider=p_1765551430245, model=gpt-5-high, custom_url=https://api.codexzh.com, has_api_key=True
+2025-12-12 23:22:59 - [32mINFO[0m - [httpx] HTTP Request: POST https://api.codexzh.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-12-12 23:22:59 - [32mINFO[0m - [modules.middleware] [be787c39] 200 14538.56ms
+2025-12-12 23:22:59 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /v1/chat/completions took 14538.56ms
+2025-12-12 23:22:59 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "a4b0c0e1b6b5db6e", "method": "POST", "path": "/v1/chat/completions", "status": 200, "duration_ms": 14541.39, "client_ip": "127.0.0.1"}
+2025-12-12 23:23:07 - [32mINFO[0m - [modules.middleware] [73ae401b] GET /
+2025-12-12 23:23:07 - [32mINFO[0m - [modules.middleware] [73ae401b] 200 2.51ms
+2025-12-12 23:23:18 - [32mINFO[0m - [modules.middleware] [47284534] POST /v1/chat/completions
+2025-12-12 23:23:18 - [32mINFO[0m - [__main__] Chat request: provider=p_1765551430245, model=gpt-5-high, custom_url=https://api.codexzh.com, has_api_key=True
+2025-12-12 23:23:25 - [32mINFO[0m - [httpx] HTTP Request: POST https://api.codexzh.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-12-12 23:23:25 - [32mINFO[0m - [modules.middleware] [47284534] 200 6835.14ms
+2025-12-12 23:23:25 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /v1/chat/completions took 6835.14ms
+2025-12-12 23:23:25 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "1c5fa6f05415ee84", "method": "POST", "path": "/v1/chat/completions", "status": 200, "duration_ms": 6844.47, "client_ip": "127.0.0.1"}
+2025-12-12 23:23:39 - [32mINFO[0m - [modules.middleware] [b58c3cb5] GET /.well-known/appspecific/com.chrome.devtools.json
+2025-12-12 23:23:39 - [32mINFO[0m - [modules.middleware] [b58c3cb5] 404 2.01ms
+2025-12-12 23:23:39 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "f23f14610da576be", "method": "GET", "path": "/.well-known/appspecific/com.chrome.devtools.json", "status": 404, "duration_ms": 2.01, "client_ip": "127.0.0.1"}
+2025-12-12 23:26:01 - [32mINFO[0m - [modules.middleware] [73bbcffe] GET /
+2025-12-12 23:26:01 - [32mINFO[0m - [modules.middleware] [73bbcffe] 200 9.00ms
+2025-12-12 23:26:01 - [32mINFO[0m - [modules.middleware] [3c68e668] GET /.well-known/appspecific/com.chrome.devtools.json
+2025-12-12 23:26:01 - [32mINFO[0m - [modules.middleware] [3c68e668] 404 4.00ms
+2025-12-12 23:26:01 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "79a8dd4d59b40781", "method": "GET", "path": "/.well-known/appspecific/com.chrome.devtools.json", "status": 404, "duration_ms": 5.0, "client_ip": "127.0.0.1"}
+2025-12-12 23:26:01 - [32mINFO[0m - [modules.middleware] [83a481a4] GET /api/prompts
+2025-12-12 23:26:01 - [32mINFO[0m - [modules.middleware] [83a481a4] 200 10.00ms
+2025-12-12 23:26:01 - [32mINFO[0m - [modules.middleware] [5cc9ce46] GET /static/sw.js
+2025-12-12 23:26:01 - [32mINFO[0m - [modules.middleware] [5cc9ce46] 200 4.00ms
+2025-12-12 23:26:02 - [32mINFO[0m - [modules.middleware] [d39b2904] GET /api/recommendations
+2025-12-12 23:26:02 - [32mINFO[0m - [modules.middleware] [d39b2904] 200 9.28ms
+2025-12-12 23:26:16 - [32mINFO[0m - [modules.middleware] [fa192c8b] POST /v1/chat/completions
+2025-12-12 23:26:16 - [32mINFO[0m - [__main__] Chat request: provider=p_1765551430245, model=gpt-5-high, custom_url=https://api.codexzh.com, has_api_key=True
+2025-12-12 23:26:18 - [32mINFO[0m - [modules.middleware] [fa192c8b] 200 1574.24ms
+2025-12-12 23:26:18 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /v1/chat/completions took 1574.24ms
+2025-12-12 23:26:18 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "4335be285eae1aef", "method": "POST", "path": "/v1/chat/completions", "status": 200, "duration_ms": 1581.18, "client_ip": "127.0.0.1"}
+2025-12-12 23:26:22 - [32mINFO[0m - [httpx] HTTP Request: POST https://api.codexzh.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-12-12 23:26:57 - [32mINFO[0m - [modules.middleware] [0b94f8ae] POST /v1/chat/completions
+2025-12-12 23:26:57 - [32mINFO[0m - [__main__] Chat request: provider=p_1765551430245, model=gpt-5-high, custom_url=https://api.codexzh.com, has_api_key=True
+2025-12-12 23:26:59 - [32mINFO[0m - [modules.middleware] [0b94f8ae] 200 2031.07ms
+2025-12-12 23:26:59 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /v1/chat/completions took 2031.07ms
+2025-12-12 23:26:59 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "e6aad2c521678290", "method": "POST", "path": "/v1/chat/completions", "status": 200, "duration_ms": 2042.08, "client_ip": "127.0.0.1"}
+2025-12-12 23:27:08 - [32mINFO[0m - [httpx] HTTP Request: POST https://api.codexzh.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-12-12 23:27:26 - [32mINFO[0m - [modules.middleware] [fb6088e7] GET /.well-known/appspecific/com.chrome.devtools.json
+2025-12-12 23:27:26 - [32mINFO[0m - [modules.middleware] [fb6088e7] 404 2.01ms
+2025-12-12 23:27:26 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "47d851ecdb4fb14b", "method": "GET", "path": "/.well-known/appspecific/com.chrome.devtools.json", "status": 404, "duration_ms": 3.01, "client_ip": "127.0.0.1"}
+2025-12-12 23:58:39 - [32mINFO[0m - [__main__] AI Hub starting...
+2025-12-12 23:58:39 - [32mINFO[0m - [__main__] Custom middlewares added
+2025-12-12 23:58:39 - [32mINFO[0m - [__main__] Extended database tables initialized
+2025-12-12 23:58:43 - [32mINFO[0m - [__main__] ✅ 使用 FakeRedis 内存缓存（功能完整）
+2025-12-12 23:58:43 - [32mINFO[0m - [__main__] UI components router registered
+2025-12-12 23:58:43 - [32mINFO[0m - [__main__] ✅ 扩展模块已加载: RBAC, 计费, RAG, 协作, 安全, 企业功能
+2025-12-12 23:58:43 - [32mINFO[0m - [__main__] Advanced logging initialized
+2025-12-12 23:58:43 - [32mINFO[0m - [modules.db_pool] aiosqlite available, using async database operations
+2025-12-12 23:58:43 - [32mINFO[0m - [modules.db_pool] Enhanced async database pool initialized: 10 connections
+2025-12-12 23:58:43 - [32mINFO[0m - [__main__] Async database pool initialized
+2025-12-12 23:58:43 - [32mINFO[0m - [__main__] Task queue started
+2025-12-12 23:58:43 - [32mINFO[0m - [modules.queue] Scheduled job added: cleanup_sessions
+2025-12-12 23:58:43 - [32mINFO[0m - [modules.queue] Scheduled job added: cleanup_logs
+2025-12-12 23:58:43 - [32mINFO[0m - [modules.queue] Scheduled job added: update_stats
+2025-12-12 23:58:43 - [32mINFO[0m - [modules.queue] Scheduler started
+2025-12-12 23:58:43 - [32mINFO[0m - [__main__] Graceful shutdown handlers registered
+2025-12-12 23:58:43 - [32mINFO[0m - [__main__] AI Hub started successfully
+2025-12-12 23:59:28 - [32mINFO[0m - [modules.middleware] [5feabb13] GET /
+2025-12-12 23:59:29 - [32mINFO[0m - [modules.middleware] [5feabb13] 200 376.63ms
+2025-12-12 23:59:29 - [32mINFO[0m - [modules.middleware] [25601f65] GET /static/enhancements.js
+2025-12-12 23:59:29 - [32mINFO[0m - [modules.middleware] [25601f65] 200 5.18ms
+2025-12-12 23:59:29 - [32mINFO[0m - [modules.middleware] [fd53f594] GET /api/prompts
+2025-12-12 23:59:29 - [32mINFO[0m - [modules.middleware] [fd53f594] 200 7.00ms
+2025-12-12 23:59:29 - [32mINFO[0m - [modules.middleware] [e80ca793] GET /static/sw.js
+2025-12-12 23:59:29 - [32mINFO[0m - [modules.middleware] [e80ca793] 200 7.01ms
+2025-12-12 23:59:30 - [32mINFO[0m - [modules.middleware] [ba353e94] GET /api/recommendations
+2025-12-12 23:59:30 - [32mINFO[0m - [modules.middleware] [ba353e94] 200 11.35ms
+2025-12-12 23:59:37 - [32mINFO[0m - [modules.middleware] [b32fb60d] POST /v1/chat/completions
+2025-12-12 23:59:37 - [32mINFO[0m - [__main__] Chat request: provider=p_1765551430245, model=gpt-5-high, custom_url=https://api.codexzh.com, has_api_key=True
+2025-12-12 23:59:44 - [32mINFO[0m - [httpx] HTTP Request: POST https://api.codexzh.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-12-12 23:59:44 - [32mINFO[0m - [modules.middleware] [b32fb60d] 200 7357.38ms
+2025-12-12 23:59:44 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /v1/chat/completions took 7357.38ms
+2025-12-12 23:59:44 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "6550ae6a65675eb9", "method": "POST", "path": "/v1/chat/completions", "status": 200, "duration_ms": 7366.81, "client_ip": "127.0.0.1"}
+2025-12-13 00:00:50 - [32mINFO[0m - [modules.middleware] [7f1bd614] POST /v1/chat/completions
+2025-12-13 00:00:50 - [32mINFO[0m - [__main__] Chat request: provider=p_1765551430245, model=gpt-5-high, custom_url=https://api.codexzh.com, has_api_key=True
+2025-12-13 00:00:52 - [32mINFO[0m - [modules.middleware] [7f1bd614] 200 2234.32ms
+2025-12-13 00:00:52 - [33mWARNING[0m - [modules.monitoring] Slow operation: HTTP POST /v1/chat/completions took 2234.32ms
+2025-12-13 00:00:52 - [33mWARNING[0m - [__main__] Slow request: {"request_id": "a6f30ebe1de24194", "method": "POST", "path": "/v1/chat/completions", "status": 200, "duration_ms": 2240.96, "client_ip": "127.0.0.1"}
+2025-12-13 00:00:59 - [32mINFO[0m - [httpx] HTTP Request: POST https://api.codexzh.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-12-13 00:10:11 - [32mINFO[0m - [modules.middleware] [45b85c8e] GET /api/auth/github
+2025-12-13 00:10:11 - [32mINFO[0m - [modules.middleware] [45b85c8e] 500 4.46ms
+2025-12-13 00:10:11 - [33mWARNING[0m - [__main__] Request failed: {"request_id": "288e1b970b13b160", "method": "GET", "path": "/api/auth/github", "status": 500, "duration_ms": 5.79, "client_ip": "127.0.0.1"}
+2025-12-13 00:12:37 - [32mINFO[0m - [modules.middleware] [2fb174ea] GET /
+2025-12-13 00:12:37 - [32mINFO[0m - [modules.middleware] [2fb174ea] 200 5.52ms
+2025-12-13 00:12:37 - [32mINFO[0m - [modules.middleware] [5d12c61a] GET /static/enhancements.js
+2025-12-13 00:12:37 - [32mINFO[0m - [modules.middleware] [5d12c61a] 304 7.51ms
+2025-12-13 00:12:37 - [32mINFO[0m - [modules.middleware] [aaaf5887] GET /api/prompts
+2025-12-13 00:12:37 - [32mINFO[0m - [modules.middleware] [aaaf5887] 200 9.00ms
+2025-12-13 00:12:37 - [32mINFO[0m - [modules.middleware] [3d90c6d0] GET /static/sw.js
+2025-12-13 00:12:37 - [32mINFO[0m - [modules.middleware] [3d90c6d0] 200 8.51ms
+2025-12-13 00:12:38 - [32mINFO[0m - [modules.middleware] [d0b9c74a] GET /api/recommendations
+2025-12-13 00:12:38 - [32mINFO[0m - [modules.middleware] [d0b9c74a] 200 12.59ms

@@ -372,3 +372,271 @@ async def apply_theme(data: dict, user=None):
         """, (user["id"], json.dumps(current)))
     
     return {"success": True, "theme": theme_id}
+
+
+# ========== 数据导出导入 API ==========
+from fastapi.responses import StreamingResponse
+import io
+
+
+@router.get("/api/export/conversations")
+async def export_conversations(format: str = "json", user=None):
+    """导出对话数据"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    from .data_export import exporter, ExportConfig
+
+    config = ExportConfig(format=format)
+    data = exporter.export_conversations(user["id"], config)
+
+    media_type = "application/json" if format == "json" else "text/csv"
+    filename = f"conversations_{user['id']}.{format}"
+
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/api/export/notes")
+async def export_notes(format: str = "json", user=None):
+    """导出笔记数据"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    from .data_export import exporter, ExportConfig
+
+    config = ExportConfig(format=format)
+    data = exporter.export_notes(user["id"], config)
+
+    media_type = "application/json" if format == "json" else "text/csv"
+    filename = f"notes_{user['id']}.{format}"
+
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/api/export/all")
+async def export_all_data(user=None):
+    """导出所有用户数据（GDPR 合规）"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    from .data_export import exporter, ExportConfig
+
+    config = ExportConfig(format="zip")
+    data = exporter.export_all_user_data(user["id"], config)
+
+    filename = f"user_data_{user['id']}.zip"
+
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.post("/api/import/conversations")
+async def import_conversations(request: Request, user=None):
+    """导入对话数据"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    from .data_export import importer
+
+    body = await request.body()
+    result = importer.import_conversations(user["id"], body)
+
+    return result
+
+
+@router.post("/api/import/notes")
+async def import_notes(request: Request, user=None):
+    """导入笔记数据"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    from .data_export import importer
+
+    body = await request.body()
+    result = importer.import_notes(user["id"], body)
+
+    return result
+
+
+# ========== 安全相关 API ==========
+@router.get("/api/security/waf/stats")
+async def get_waf_stats(user=None):
+    """获取 WAF 统计"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    from .security import waf
+
+    return waf.get_stats()
+
+
+@router.get("/api/security/waf/blocked-ips")
+async def get_blocked_ips(user=None):
+    """获取被封禁的 IP 列表"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    if not rbac.has_permission(user["id"], "admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+
+    from .security import waf
+
+    return waf.get_blocked_ips()
+
+
+@router.post("/api/security/waf/unblock/{ip}")
+async def unblock_ip(ip: str, user=None):
+    """解封 IP"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    if not rbac.has_permission(user["id"], "admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+
+    from .security import waf
+
+    waf.unblock_ip(ip)
+    return {"success": True}
+
+
+@router.get("/api/security/audit/events")
+async def get_audit_events(
+    event_type: str = None,
+    severity: str = None,
+    days: int = 7,
+    limit: int = 100,
+    user=None,
+):
+    """获取安全审计事件"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    if not rbac.has_permission(user["id"], "admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+
+    from .security import auditor
+
+    return auditor.get_events(event_type, severity, None, days, limit)
+
+
+@router.get("/api/security/audit/summary")
+async def get_audit_summary(days: int = 7, user=None):
+    """获取安全审计汇总"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    if not rbac.has_permission(user["id"], "admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+
+    from .security import auditor
+
+    return auditor.get_summary(days)
+
+
+@router.get("/api/security/audit/report")
+async def get_audit_report(days: int = 30, user=None):
+    """生成安全审计报告"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    if not rbac.has_permission(user["id"], "admin"):
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+
+    from .security import auditor
+
+    return auditor.generate_report(days)
+
+
+# ========== 系统监控 API ==========
+@router.get("/api/system/metrics")
+async def get_system_metrics(user=None):
+    """获取系统指标"""
+    from .monitoring import metrics
+
+    return metrics.get_stats()
+
+
+@router.get("/api/system/metrics/prometheus")
+async def get_prometheus_metrics():
+    """获取 Prometheus 格式指标"""
+    from .monitoring import metrics
+    from fastapi.responses import PlainTextResponse
+
+    return PlainTextResponse(
+        metrics.get_prometheus_metrics(), media_type="text/plain"
+    )
+
+
+@router.get("/api/system/traces")
+async def get_traces(limit: int = 100, user=None):
+    """获取链路追踪数据"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    from .monitoring import tracer
+
+    return tracer.get_traces(limit)
+
+
+@router.get("/api/system/profiler")
+async def get_profiler_stats(user=None):
+    """获取性能分析数据"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    from .monitoring import profiler
+
+    return profiler.get_stats()
+
+
+@router.get("/api/system/profiler/slow")
+async def get_slow_operations(threshold_ms: float = 1000, user=None):
+    """获取慢操作列表"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    from .monitoring import profiler
+
+    return profiler.get_slow_operations(threshold_ms)
+
+
+@router.get("/api/system/db/stats")
+async def get_db_stats(user=None):
+    """获取数据库连接池统计"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    from .db_pool import enhanced_db_pool, query_profiler
+
+    return {
+        "pool": enhanced_db_pool.get_stats(),
+        "queries": query_profiler.get_stats(),
+    }
+
+
+@router.get("/api/system/db/slow-queries")
+async def get_slow_queries(user=None):
+    """获取慢查询列表"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    from .db_pool import query_profiler
+
+    return query_profiler.get_slow_queries()
+
+
+@router.get("/api/system/shutdown-status")
+async def get_shutdown_status(user=None):
+    """获取关闭状态"""
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    from .monitoring import shutdown_manager
+
+    return shutdown_manager.get_status()

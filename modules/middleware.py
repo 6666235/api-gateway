@@ -231,21 +231,233 @@ class CORSMiddleware(BaseHTTPMiddleware):
         
         return response
 
+# ========== WAF 中间件 ==========
+class WAFMiddleware(BaseHTTPMiddleware):
+    """Web 应用防火墙中间件"""
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        client_ip = getattr(request.state, "client_ip", "unknown")
+
+        try:
+            from .security import waf, auditor
+
+            # 检查 IP 是否被封禁
+            if waf.is_ip_blocked(client_ip):
+                return JSONResponse(
+                    status_code=403,
+                    content={"error": "Forbidden", "message": "IP 已被临时封禁"},
+                )
+
+            # 检查请求内容
+            if request.method in ["POST", "PUT", "PATCH"]:
+                try:
+                    body = await request.body()
+                    if body:
+                        content = body.decode("utf-8", errors="ignore")
+                        result = waf.check(content, client_ip)
+
+                        if result["blocked"]:
+                            # 记录安全事件
+                            auditor.log_event(
+                                event_type="waf_blocked",
+                                severity="warning",
+                                ip=client_ip,
+                                resource=request.url.path,
+                                details={"violations": result["violations"]},
+                            )
+
+                            return JSONResponse(
+                                status_code=403,
+                                content={
+                                    "error": "Forbidden",
+                                    "message": "请求包含不安全内容",
+                                },
+                            )
+                except:
+                    pass
+
+        except ImportError:
+            pass
+
+        return await call_next(request)
+
+
+# ========== CSRF 中间件 ==========
+class CSRFMiddleware(BaseHTTPMiddleware):
+    """CSRF 防护中间件"""
+
+    def __init__(self, app, exempt_paths: list = None):
+        super().__init__(app)
+        self.exempt_paths = exempt_paths or ["/api/auth/", "/health", "/docs", "/redoc"]
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        # 跳过安全方法
+        if request.method in ["GET", "HEAD", "OPTIONS"]:
+            return await call_next(request)
+
+        # 跳过豁免路径
+        for path in self.exempt_paths:
+            if request.url.path.startswith(path):
+                return await call_next(request)
+
+        # 验证 CSRF Token
+        try:
+            from .security import csrf_protection
+
+            csrf_token = request.headers.get(
+                "X-CSRF-Token"
+            ) or request.headers.get("X-Csrf-Token")
+            session_id = request.cookies.get("session_id", "")
+
+            if not csrf_token or not csrf_protection.validate_token(
+                csrf_token, session_id
+            ):
+                # 对于 API 请求，也检查 Authorization header
+                if request.headers.get("Authorization"):
+                    return await call_next(request)
+
+                logger.warning(
+                    f"CSRF validation failed: {request.url.path}"
+                )
+                return JSONResponse(
+                    status_code=403,
+                    content={"error": "Forbidden", "message": "CSRF 验证失败"},
+                )
+        except ImportError:
+            pass
+
+        return await call_next(request)
+
+
+# ========== 请求签名验证中间件 ==========
+class SignatureMiddleware(BaseHTTPMiddleware):
+    """API 请求签名验证中间件"""
+
+    def __init__(self, app, required_paths: list = None):
+        super().__init__(app)
+        self.required_paths = required_paths or []
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        # 检查是否需要签名验证
+        needs_signature = any(
+            request.url.path.startswith(p) for p in self.required_paths
+        )
+
+        if not needs_signature:
+            return await call_next(request)
+
+        try:
+            from .security import request_signer
+
+            timestamp = request.headers.get("X-Timestamp")
+            nonce = request.headers.get("X-Nonce")
+            signature = request.headers.get("X-Signature")
+
+            if not all([timestamp, nonce, signature]):
+                return JSONResponse(
+                    status_code=401,
+                    content={"error": "Unauthorized", "message": "缺少签名信息"},
+                )
+
+            # 获取请求体
+            body = None
+            if request.method in ["POST", "PUT", "PATCH"]:
+                body = (await request.body()).decode("utf-8", errors="ignore")
+
+            # 验证签名
+            is_valid, error = request_signer.verify_request(
+                method=request.method,
+                path=request.url.path,
+                timestamp=timestamp,
+                nonce=nonce,
+                signature=signature,
+                params=dict(request.query_params),
+                body=body,
+            )
+
+            if not is_valid:
+                return JSONResponse(
+                    status_code=401,
+                    content={"error": "Unauthorized", "message": error},
+                )
+
+        except ImportError:
+            pass
+
+        return await call_next(request)
+
+
+# ========== 请求追踪中间件 ==========
+class TracingMiddleware(BaseHTTPMiddleware):
+    """分布式追踪中间件"""
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        try:
+            from .monitoring import tracer
+
+            # 获取或生成 trace ID
+            trace_id = request.headers.get("X-Trace-ID")
+            parent_id = request.headers.get("X-Span-ID")
+
+            span = tracer.start_span(
+                f"{request.method} {request.url.path}",
+                trace_id=trace_id,
+                parent_id=parent_id,
+            )
+
+            span.set_tag("http.method", request.method)
+            span.set_tag("http.url", str(request.url))
+            span.set_tag(
+                "http.client_ip",
+                getattr(request.state, "client_ip", "unknown"),
+            )
+
+            try:
+                response = await call_next(request)
+                span.set_tag("http.status_code", str(response.status_code))
+
+                # 添加追踪头到响应
+                response.headers["X-Trace-ID"] = span.trace_id
+                response.headers["X-Span-ID"] = span.span_id
+
+                return response
+            except Exception as e:
+                span.set_error(e)
+                raise
+            finally:
+                tracer.record_span(span)
+
+        except ImportError:
+            return await call_next(request)
+
+
 # ========== 工具函数 ==========
 def setup_middlewares(app, config: dict = None):
     """设置所有中间件"""
     config = config or {}
-    
+
     # 顺序很重要：最后添加的最先执行
     app.add_middleware(RequestLoggingMiddleware)
     app.add_middleware(ErrorHandlingMiddleware)
+    app.add_middleware(TracingMiddleware)
+    app.add_middleware(SecurityMiddleware, blocked_ips=config.get("blocked_ips", set()))
     app.add_middleware(
-        SecurityMiddleware,
-        blocked_ips=config.get("blocked_ips", set())
+        RateLimitMiddleware, requests_per_minute=config.get("rate_limit", 60)
     )
-    app.add_middleware(
-        RateLimitMiddleware,
-        requests_per_minute=config.get("rate_limit", 60)
-    )
-    
+
+    # 可选中间件
+    if config.get("enable_waf", True):
+        app.add_middleware(WAFMiddleware)
+
+    if config.get("enable_csrf", False):
+        app.add_middleware(
+            CSRFMiddleware, exempt_paths=config.get("csrf_exempt_paths", [])
+        )
+
+    if config.get("signature_required_paths"):
+        app.add_middleware(
+            SignatureMiddleware,
+            required_paths=config.get("signature_required_paths", []),
+        )
+
     logger.info("Middlewares configured")

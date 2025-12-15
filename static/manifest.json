@@ -6,7 +6,17 @@
   "display": "standalone",
   "background_color": "#0f0f1a",
   "theme_color": "#6366f1",
+  "orientation": "any",
+  "scope": "/",
+  "lang": "zh-CN",
+  "categories": ["productivity", "utilities"],
   "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
     {
       "src": "/static/icon-192.png",
       "sizes": "192x192",
@@ -17,5 +27,24 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "新建对话",
+      "short_name": "新对话",
+      "description": "开始新的 AI 对话",
+      "url": "/?action=new-chat",
+      "icons": [{"src": "/static/icon.svg", "sizes": "96x96"}]
+    },
+    {
+      "name": "笔记",
+      "short_name": "笔记",
+      "description": "查看笔记",
+      "url": "/?page=notes",
+      "icons": [{"src": "/static/icon.svg", "sizes": "96x96"}]
+    }
+  ],
+  "screenshots": [],
+  "related_applications": [],
+  "prefer_related_applications": false
 }

@@ -1,10 +1,11 @@
 # 🤖 AI Hub - 企业级统一 AI 平台
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.1.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.2.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/python-3.9+-green.svg" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
-  <img src="https://img.shields.io/badge/features-80+-brightgreen.svg" alt="Features">
+  <img src="https://img.shields.io/badge/features-100+-brightgreen.svg" alt="Features">
+  <img src="https://img.shields.io/badge/tests-28%20passed-success.svg" alt="Tests">
 </p>
 
 一站式企业级 AI 对话平台，支持 10+ 模型服务商，包含完整的用户系统、团队协作、付费功能和运维监控。
@@ -302,6 +303,57 @@ api-gateway/
 └── .github/workflows/     # CI/CD 配置
     └── ci.yml
 ```
+
+## 🆕 v2.2 新增优化
+
+### ⚡ 性能优化
+- **异步数据库连接池**：使用 aiosqlite 实现异步数据库操作
+- **查询缓存**：自动缓存 SELECT 查询结果，支持 TTL
+- **查询性能分析**：自动记录慢查询，提供性能统计
+- **响应缓存**：API 响应缓存，减少重复计算
+
+### 📝 日志增强
+- **日志轮转**：支持按大小和时间轮转
+- **日志压缩**：自动 gzip 压缩旧日志
+- **异步日志**：非阻塞日志写入
+- **结构化日志**：JSON 格式日志输出
+
+### 🔒 安全增强
+- **CSRF 防护**：Token 生成和验证
+- **请求签名**：API 请求签名验证，防重放攻击
+- **敏感配置加密**：.env 中的 API Key 加密存储
+- **WAF 中间件**：自动拦截恶意请求
+
+### 🌐 WebSocket 增强
+- **断线重连**：自动重连机制，指数退避
+- **心跳检测**：保持连接活跃
+- **消息队列**：离线消息缓存
+
+### 💾 数据管理
+- **任务队列持久化**：重启后自动恢复未完成任务
+- **数据导出**：支持 JSON/CSV/ZIP 格式导出
+- **数据导入**：批量导入对话和笔记
+- **GDPR 合规**：一键导出所有用户数据
+
+### 🏥 健康检查
+- **多组件检查**：数据库、磁盘、内存、CPU
+- **超时控制**：检查超时自动标记不健康
+- **历史记录**：检查结果历史和正常运行时间统计
+
+### 🛑 优雅关闭
+- **请求追踪**：等待活跃请求完成
+- **处理器优先级**：按优先级执行关闭处理器
+- **超时保护**：防止关闭过程卡死
+
+### 📊 PWA 增强
+- **完整图标**：192x192、512x512 PNG 和 SVG 图标
+- **Service Worker**：离线缓存、推送通知、后台同步
+- **快捷方式**：PWA 快捷操作
+
+### 🧪 测试覆盖
+- **28+ 单元测试**：覆盖核心模块
+- **API 测试**：端点功能测试
+- **性能基准**：benchmark.py 性能测试工具
 
 ## 🆕 v2.1 新增优化
 

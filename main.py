@@ -34,14 +34,35 @@ GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
 
 # ========== 日志配置 ==========
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL),
-    format='%(asctime)s - %(levelname)s - [%(name)s] %(message)s',
-    handlers=[
-        logging.FileHandler('app.log', encoding='utf-8'),
-        logging.StreamHandler()
-    ]
-)
+
+# 使用增强的日志配置（带轮转）
+try:
+    from modules.logging_config import setup_advanced_logging
+    setup_advanced_logging(
+        log_level=LOG_LEVEL,
+        log_file="app.log",
+        max_size_mb=50,
+        backup_count=10,
+        compress_old_logs=True,
+        async_logging=False  # 启动时先用同步，startup 事件中切换
+    )
+except ImportError:
+    # 回退到基础配置
+    from logging.handlers import RotatingFileHandler
+    logging.basicConfig(
+        level=getattr(logging, LOG_LEVEL),
+        format='%(asctime)s - %(levelname)s - [%(name)s] %(message)s',
+        handlers=[
+            RotatingFileHandler(
+                'app.log',
+                maxBytes=50*1024*1024,  # 50MB
+                backupCount=10,
+                encoding='utf-8'
+            ),
+            logging.StreamHandler()
+        ]
+    )
+
 logger = logging.getLogger(__name__)
 
 # ========== 请求缓存 ==========
@@ -170,8 +191,15 @@ class RateLimiter:
 
 rate_limiter = RateLimiter(requests_per_minute=60)
 
-app = FastAPI(title="AI Hub", description="统一 AI 平台")
+app = FastAPI(
+    title="AI Hub",
+    description="统一 AI 平台",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
 
+# CORS 中间件
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -179,6 +207,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 添加自定义中间件
+try:
+    from modules.middleware import (
+        RequestLoggingMiddleware,
+        ErrorHandlingMiddleware,
+        SecurityMiddleware
+    )
+    app.add_middleware(RequestLoggingMiddleware)
+    app.add_middleware(ErrorHandlingMiddleware)
+    app.add_middleware(SecurityMiddleware)
+    logger.info("Custom middlewares added")
+except ImportError as e:
+    logger.warning(f"Custom middlewares not available: {e}")
 
 # 数据库初始化
 DB_PATH = "data.db"
@@ -707,21 +749,53 @@ async def logout(authorization: Optional[str] = Header(None)):
 async def health_check():
     """健康检查接口"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.execute("SELECT 1")
-        db_status = "healthy"
-    except:
-        db_status = "unhealthy"
-    
-    return {
-        "status": "ok" if db_status == "healthy" else "degraded",
-        "timestamp": datetime.now().isoformat(),
-        "version": "1.0.0",
-        "components": {
-            "database": db_status,
-            "api": "healthy"
+        from modules.monitoring import health_checker
+        return await health_checker.check_all()
+    except ImportError:
+        # 回退到基础检查
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.execute("SELECT 1")
+            db_status = "healthy"
+        except:
+            db_status = "unhealthy"
+        
+        return {
+            "status": "ok" if db_status == "healthy" else "degraded",
+            "timestamp": datetime.now().isoformat(),
+            "version": "1.0.0",
+            "components": {
+                "database": db_status,
+                "api": "healthy"
+            }
         }
-    }
+
+
+# ========== CSRF Token 端点 ==========
+@app.get("/api/csrf-token")
+async def get_csrf_token(request: Request):
+    """获取 CSRF Token"""
+    try:
+        from modules.security import csrf_protection
+        session_id = request.cookies.get("session_id", "")
+        token = csrf_protection.generate_token(session_id)
+        return {"csrf_token": token}
+    except ImportError:
+        return {"csrf_token": secrets.token_hex(32)}
+
+
+@app.post("/api/csrf-verify")
+async def verify_csrf_token(request: Request):
+    """验证 CSRF Token"""
+    try:
+        from modules.security import csrf_protection
+        data = await request.json()
+        token = data.get("token", "")
+        session_id = request.cookies.get("session_id", "")
+        is_valid = csrf_protection.validate_token(token, session_id)
+        return {"valid": is_valid}
+    except ImportError:
+        return {"valid": True}
 
 @app.get("/api/stats")
 async def get_stats(user=Depends(get_current_user)):
@@ -2918,6 +2992,9 @@ async def chat_completions(request: ChatRequest, req: Request, user=Depends(get_
     provider = request.provider.lower()
     start_time = time.time()
     
+    # 调试日志
+    logger.info(f"Chat request: provider={provider}, model={request.model}, custom_url={request.custom_url}, has_api_key={bool(request.api_key)}")
+    
     # 速率限制
     rate_key = f"user_{user['id']}" if user else f"ip_{req.client.host}"
     if not await rate_limiter.is_allowed(rate_key):
@@ -2943,7 +3020,17 @@ async def chat_completions(request: ChatRequest, req: Request, user=Depends(get_
                 base_url = row[1] or base_url
     
     # 自定义平台
-    if provider == "custom":
+    if provider in PROVIDERS:
+        # 预定义的平台
+        config = PROVIDERS[provider]
+        api_key = api_key or os.getenv(config["env_key"])
+        base_url = base_url or config["base_url"]
+        provider_type = config.get("type", "openai")
+        
+        if not api_key:
+            raise HTTPException(status_code=500, detail=f"未配置 {provider} 的 API Key")
+    else:
+        # 自定义平台（包括 provider=="custom" 或用户自定义的服务商）
         if not base_url:
             raise HTTPException(status_code=400, detail="自定义平台需要填写 API 地址")
         if not api_key:
@@ -2953,16 +3040,6 @@ async def chat_completions(request: ChatRequest, req: Request, user=Depends(get_
         if not base_url.endswith('/v1'):
             base_url = base_url + '/v1'
         provider_type = "openai"
-    elif provider not in PROVIDERS:
-        raise HTTPException(status_code=400, detail=f"不支持的平台: {provider}")
-    else:
-        config = PROVIDERS[provider]
-        api_key = api_key or os.getenv(config["env_key"])
-        base_url = base_url or config["base_url"]
-        provider_type = config.get("type", "openai")
-        
-        if not api_key:
-            raise HTTPException(status_code=500, detail=f"未配置 {provider} 的 API Key")
     
     # 清理 API Key 中的中文标点
     api_key = clean_api_key(api_key)
@@ -5080,6 +5157,29 @@ async def startup_event():
     import time
     app.state.start_time = time.time()
     
+    # 初始化增强日志系统
+    try:
+        from modules.logging_config import setup_advanced_logging
+        setup_advanced_logging(
+            log_level=os.getenv("LOG_LEVEL", "INFO"),
+            log_file="app.log",
+            max_size_mb=50,
+            backup_count=10,
+            compress_old_logs=True,
+            async_logging=True
+        )
+        logger.info("Advanced logging initialized")
+    except Exception as e:
+        logger.warning(f"Advanced logging setup failed: {e}")
+    
+    # 初始化异步数据库连接池
+    try:
+        from modules.db_pool import enhanced_db_pool
+        await enhanced_db_pool.initialize()
+        logger.info("Async database pool initialized")
+    except Exception as e:
+        logger.warning(f"Async database pool init failed: {e}")
+    
     # 启动任务队列
     try:
         await task_queue.start()
@@ -5093,22 +5193,48 @@ async def startup_event():
     except Exception as e:
         logger.warning(f"Scheduler start failed: {e}")
     
+    # 注册优雅关闭处理器
+    try:
+        from modules.monitoring import shutdown_manager
+        
+        async def close_db_pool():
+            from modules.db_pool import enhanced_db_pool
+            await enhanced_db_pool.close()
+        
+        async def stop_task_queue():
+            await task_queue.stop()
+        
+        async def stop_scheduler():
+            from modules.queue import scheduler
+            await scheduler.stop()
+        
+        shutdown_manager.register_handler(stop_task_queue, priority=10)
+        shutdown_manager.register_handler(stop_scheduler, priority=9)
+        shutdown_manager.register_handler(close_db_pool, priority=5)
+        logger.info("Graceful shutdown handlers registered")
+    except Exception as e:
+        logger.warning(f"Shutdown handlers registration failed: {e}")
+    
     logger.info("AI Hub started successfully")
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    # 停止任务队列
+    """优雅关闭"""
     try:
-        await task_queue.stop()
-    except:
-        pass
-    
-    # 停止调度器
-    try:
-        from modules.queue import scheduler
-        await scheduler.stop()
-    except:
-        pass
+        from modules.monitoring import shutdown_manager
+        await shutdown_manager.shutdown()
+    except Exception as e:
+        logger.error(f"Graceful shutdown failed: {e}")
+        # 回退到直接关闭
+        try:
+            await task_queue.stop()
+        except:
+            pass
+        try:
+            from modules.queue import scheduler
+            await scheduler.stop()
+        except:
+            pass
     
     logger.info("AI Hub shutdown complete")
 
@@ -5376,6 +5502,14 @@ try:
     
     # 注册扩展路由
     app.include_router(extended_router)
+    
+    # 注册 UI 组件路由
+    try:
+        from modules.ui_components import router as ui_router
+        app.include_router(ui_router)
+        logger.info("UI components router registered")
+    except ImportError as e:
+        logger.warning(f"UI components not available: {e}")
     
     # 添加安全检查中间件
     @app.middleware("http")
